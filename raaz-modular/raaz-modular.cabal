@@ -24,6 +24,9 @@ library
                  , Raaz.RSA.Signature
                  , Raaz.Number.Internals
                  , Raaz.DH
+                 , Raaz.ECDH
+                 , Raaz.ECDH.Types
+                 , Raaz.ECDH.Exchange
                  , Raaz.KeyExchange
   other-modules: Raaz.RSA.Types
                , Raaz.RSA.Signature.Instances

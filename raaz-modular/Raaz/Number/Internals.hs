@@ -5,6 +5,7 @@
 {-# LANGUAGE CPP                        #-}
 module Raaz.Number.Internals
        ( Word128
+       , Word192
        , Word256
        , Word512
        , Word1024
@@ -17,6 +18,8 @@ module Raaz.Number.Internals
        -- $Parser$
        , parseWord, writeWord
        , parseWordBE, writeWordBE
+       , parseWord32, writeWord32
+       , parseWord32BE, writeWord32BE
        ) where
 
 import Data.Bits
@@ -83,6 +86,53 @@ writeWordBE w = writeW (sizeOf w) w
     writeW !n !i = writeW (n-8) q <> writeStorable (fromIntegral r :: Word64BE)
       where (q,r)  = i `quotRem` 18446744073709551616
 
+
+-- $Parsers$
+--
+-- For 'Word32'.
+
+-- | Parses a Word32.
+parseWord32 :: (Num w, Storable w) => Parser w
+parseWord32 = with undefined
+  where
+    with :: (Num w, Storable w) => w -> Parser w
+    with w = go 0 (sizeOf w)
+    go :: Num w => w -> Int -> Parser w
+    go !result 0 = return result
+    go !result n = (parseStorable :: Parser Word32) >>= recurse
+      where
+        recurse m = go (result * 4294967296 + fromIntegral m) (n - 4) -- result * 2^32 + m
+
+-- | Writes an Word32. .
+writeWord32 :: (Num w, Storable w, Integral w) => w -> Write
+writeWord32 w = writeW (sizeOf w) w
+  where
+    writeW 0  _  = mempty
+    writeW !n !i = writeW (n-4) q <> writeStorable (fromIntegral r :: Word32)
+      where (q,r)  = i `quotRem` 4294967296
+
+
+-- | Parses a Word32 in network byte order (Big Endian)
+parseWord32BE :: (Num w, Storable w) => Parser w
+parseWord32BE = with undefined
+  where
+    with :: (Num w, Storable w) => w -> Parser w
+    with w = go 0 (sizeOf w)
+    go :: Num w => w -> Int -> Parser w
+    go !result 0 = return result
+    go !result n = (parse :: Parser Word32BE) >>= recurse
+      where
+        recurse m = go (result * 4294967296 + fromIntegral m) (n - 4) -- result * 2^32 + m
+
+-- | Writes an Word32. .
+writeWord32BE :: (Num w, Storable w, Integral w) => w -> Write
+writeWord32BE w = writeW (sizeOf w) w
+  where
+    writeW 0  _  = mempty
+    writeW !n !i = writeW (n-4) q <> writeStorable (fromIntegral r :: Word32BE)
+      where (q,r)  = i `quotRem` 4294967296
+
+
 -- | 128 Bit Word
 newtype Word128 = Word128 Integer
                   deriving (Integral, Show, Ord, Real, Modular, Typeable)
@@ -142,6 +192,68 @@ instance Bits Word128 where
 instance Storable Word128 where
   sizeOf _     = 16
   alignment _  = alignment (undefined :: Word64)
+  peek ptr     = runParser (castPtr ptr) parseWord
+  poke ptr     = runWrite (castPtr ptr) . writeWord
+
+-- | 192 Bit Word
+newtype Word192 = Word192 Integer
+                  deriving (Integral, Show, Ord, Real, Modular, Typeable)
+
+-- | Reduced Int to lower order 192 Bits
+narrowWord192 :: Integer -> Integer
+narrowWord192 w = w `mod` twoPow193
+{-# INLINE narrowWord192 #-}
+
+twoPow193 :: Integer
+twoPow193 = 1 `shiftL` 193
+{-# INLINE twoPow193 #-}
+
+instance Num Word192 where
+  (+) (Word192 a) (Word192 b) = Word192 $ narrowWord192 (a + b)
+  (-) (Word192 a) (Word192 b) = Word192 $ narrowWord192 (a - b)
+  (*) (Word192 a) (Word192 b) = Word192 $ narrowWord192 (a * b)
+  abs x                       = x
+  signum 0                    = 0
+  signum _                    = 1
+  fromInteger                 = Word192 . narrowWord192
+
+-- | Timing independent equality comparison
+instance Eq Word192 where
+  (==) a b = safeAllBS (==0) $ i2osp i 24
+    where (Word192 i) = a `xor` b
+
+instance Bounded Word192 where
+  minBound = 0
+  maxBound = Word192 $ twoPow193 - 1
+
+instance Enum Word192 where
+  succ x | x /= maxBound = x + 1
+         | otherwise     = error "succ: Word192"
+  pred x | x /= minBound = x - 1
+         | otherwise     = error "pred: Word192"
+  toEnum                 = Word192 . toEnum
+  fromEnum (Word192 a)   = fromEnum a
+
+instance Bits Word192 where
+  (.&.)   (Word192 x) (Word192 y) = Word192 (x .&. y)
+  (.|.)   (Word192 x) (Word192 y) = Word192 (x .|. y)
+  xor     (Word192 x) (Word192 y) = Word192 (x `xor` y)
+  complement (Word192 x)          = Word192 $ complement x
+  shiftL  (Word192 w) i           = Word192 $ narrowWord192 $ shiftL w i
+  shiftR  (Word192 w) i           = Word192 $ narrowWord192 $ shiftR w i
+  rotateL (Word192 w) i           = Word192 $ narrowWord192 $ rotateL w i
+  rotateR (Word192 w) i           = Word192 $ narrowWord192 $ rotateR w i
+  bitSize  _                      = 192
+  isSigned _                      = False
+#if MIN_VERSION_base(4,6,0)
+  popCount                        = popCountDefault
+  bit                             = bitDefault
+  testBit                         = testBitDefault
+#endif
+
+instance Storable Word192 where
+  sizeOf _     = 24
+  alignment _  = alignment (undefined :: Word32)
   peek ptr     = runParser (castPtr ptr) parseWord
   poke ptr     = runWrite (castPtr ptr) . writeWord
 
