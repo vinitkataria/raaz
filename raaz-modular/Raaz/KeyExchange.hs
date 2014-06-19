@@ -20,7 +20,9 @@ newtype SharedSecret w = SharedSecret w
                        deriving (Show, Eq, Ord, Num, Integral, Storable, Modular, Real, Enum)
 
 -- | Public key
-newtype PublicNum w = PublicNum w
+newtype PublicNum w =
+                  PublicNum w
+--                | PublicNumECC {x :: w , y :: w}
                     deriving (Show, Eq, Ord, Num, Integral, Storable, Modular, Real, Enum)
 
 -- | Private key
