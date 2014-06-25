@@ -83,15 +83,7 @@ modinv a m = let (g, r, _) = egcd a m
 
 -- Montgomery curve equation : by^2 = x^3 + ax^2 + x, p = prime, g = basepoint
 -- for curve25519 A = 486662, w = Word256, prime p = 2^255 - 19, basepoint Gx = 9
-data Curve25519 w = Curve25519
-                    { l  :: Int
-                    , a  :: w
-                    , b  :: w
-                    , p  :: w
-                    , gx :: w
-                    , gy :: w
-                    , q  :: w
-                    } deriving (Eq, Show)
+data Curve25519 w = Curve25519 deriving (Eq, Show)
 
 instance ECPrime (Curve25519 Word256) where
   type WordTypePrime (Curve25519 Word256) = Word256
@@ -162,15 +154,7 @@ instance ECclass (Curve25519 Word256) Word256 where
 
 -- Curve equation : y^2 = x^3 + ax + b, p = prime, g = basepoint
 -- for P192 A = -3, w = Word192
-data NISTp192 w = NISTp192
-                    { l'  :: Int
-                    , a'  :: w
-                    , b'  :: w
-                    , p'  :: w
-                    , gx' :: w
-                    , gy' :: w
-                    , q'  :: w
-                    } deriving (Eq, Show)
+data NISTp192 w = NISTp192 deriving (Eq, Show)
 
 instance ECPrime (NISTp192 Word192) where
   type WordTypePrime (NISTp192 Word192) = Word192

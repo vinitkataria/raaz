@@ -26,13 +26,16 @@ generateParamsCurve25519 :: ( StreamGadget g)
                           => RandomSource g
                           -> Curve25519 Word256
                           -> IO (PrivateNum Word256, PublicNum Word256)
-generateParamsCurve25519 rsrc curve@(Curve25519 _ _ _ _ gx'' _ q'') = do
-  xrandom <- genBetween rsrc (2::Word256) (q'' - 1)
+generateParamsCurve25519 rsrc curve = do
+  xrandom <- genBetween rsrc (2::Word256) (q - 1)
   let byte0  = (248 `shiftL` 224)
       byte31 = 127
       temp1 = (byte31 .&. (xrandom .&. byte0))
       privnum = (temp1 .|. 64)
-  return (PrivateNum privnum, PublicNum $ (getAffineX (affinify curve (pMult curve privnum (PointProj (gx'') undefined undefined)))))
+  return (PrivateNum privnum, PublicNum $ (getAffineX (affinify curve (pMult curve privnum (PointProj (gx) undefined undefined)))))
+    where
+      q = getPq curve
+      gx = getPgx curve
 
 -- | Calculate the shared secret.
 calculateSecretCurve25519 :: Curve25519 Word256
@@ -47,9 +50,13 @@ generateParamsNISTp192 :: (StreamGadget g)
                         => RandomSource g
                         -> NISTp192 Word192
                         -> IO (PrivateNum Word192, PublicNum Word192)
-generateParamsNISTp192 rsrc curve@(NISTp192 _ _ _ _ gx'' gy'' q'') = do
-  privnum <- genBetween rsrc (2::Word192) (q'' - 1)
-  return (PrivateNum privnum, PublicNum $ (getAffineX (pMult curve privnum (PointAffine gx'' gy''))))
+generateParamsNISTp192 rsrc curve = do
+  privnum <- genBetween rsrc (2::Word192) (q - 1)
+  return (PrivateNum privnum, PublicNum $ (getAffineX (pMult curve privnum (PointAffine gx gy))))
+    where
+      gx = getPgx curve
+      gy = getPgy curve
+      q  = getPq curve
 
 -- | Calculate the shared secret.
 calculateSecretNISTp192 :: NISTp192 Word192
