@@ -1,12 +1,12 @@
 {-|
 
-This module exposes all the cryptographic hash functions available
+This module exposes all the cryptographic curves available
 under the raaz library.
 
 -}
 
-module Curves.Hash
-       ( module Raaz.Hash.Blake256
+module Curves.Curves
+       ( module Raaz.Curves.Curve25519
        ) where
 
 {-# ANN module "HLint: ignore Use import/export shortcut" #-}
