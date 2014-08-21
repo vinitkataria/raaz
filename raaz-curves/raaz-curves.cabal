@@ -41,6 +41,7 @@ library
                -- Raaz dependencies
                --
                , raaz-core                      >=0.0.0.1 && < 0.0.0.2
+               , raaz-random                    >=0.0.0.1 && < 0.0.0.2
                , raaz-modular                   >=0.0.0.1 && < 0.0.0.2
 
   if arch(i386) && impl(ghc < 7.6.0)
@@ -74,6 +75,7 @@ test-Suite tests
                -- Raaz dependencies
                --
                , raaz-core                  >=0.0.0.1 && < 0.0.0.2
+               , raaz-random                >=0.0.0.1 && < 0.0.0.2
                , raaz-curves                >=0.0.0.1 && < 0.0.0.2
 
 
@@ -93,6 +95,7 @@ benchmark bench-builder-all
                --
                , raaz-core                      >=0.0.0.1 && < 0.0.0.2
                , raaz-benchmarks                >=0.0.0.1 && < 0.0.0.2
+               , raaz-random                    >=0.0.0.1 && < 0.0.0.2
                , raaz-curves                    >=0.0.0.1 && < 0.0.0.2
 
   if impl(ghc >= 7.6)

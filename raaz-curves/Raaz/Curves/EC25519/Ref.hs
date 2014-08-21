@@ -12,10 +12,16 @@ module Raaz.Curves.EC25519.Ref
        , pMult
        , affinify
        , projectify
+       , generateParamsEC25519
+       , calculateSecretEC25519
        ) where
 
 import Raaz.Curves.EC25519.Types
 import Raaz.Curves.P25519.Internal
+import Raaz.Core.Primitives.Cipher
+import Raaz.Random
+import Raaz.KeyExchange
+
 import Data.Bits
 
 --instance ECclass (EC25519 P25519) where
@@ -26,7 +32,7 @@ pDouble (PointProj x1 _ z1) = (PointProj x2 undefined z2)
     m = (x1 + z1) * (x1 + z1)
     n = (x1 - z1) * (x1 - z1)
     r = m - n
-    s = m + (((((curve25519A - 2) `div` 4)) * r))
+    s = m + (curve25519C * r)
     x2 = m * n
     z2 = r * s
 
@@ -41,8 +47,8 @@ pAdd point1@(PointProj x1 _ z1) point2@(PointProj x2 _ z2)
     e = ((m - n) * (m - n))
     z3 = (e * curve25519Gx)
 
-pMult :: Bits k => k -> (PointProj P25519) -> (PointProj P25519)
-pMult k point = montgom nbits pInfinity point
+pMult :: P25519 -> (PointProj P25519) -> (PointProj P25519)
+pMult (P25519 k) point = montgom nbits pInfinity point
   where
     nbits = numberOfBits k 0
     numberOfBits n count
@@ -80,3 +86,25 @@ affinify (PointProj x y z) = (PointAffine x1 y1)
 
 projectify :: (PointAffine P25519) -> (PointProj P25519)
 projectify (PointAffine x y) = (PointProj x y 1)
+
+-- | Generates the private number x (1 < x < q) and public number scalar multiple of basepoint.
+generateParamsEC25519 :: ( StreamGadget g )
+                          => RandomSource g
+                          -> IO (PrivateNum P25519, PublicNum P25519)
+generateParamsEC25519 rsrc = do
+  xrandom <- genBetween rsrc 2 (curve25519Q - 1)
+  let temp1 = (248 `shiftL` 224)                 --
+      temp2 = temp1 .|. ((1 `shiftL` 224) - 1)   --
+      temp3 = xrandom .&. temp2                  -- (Leftmost-byte AND with 248)
+      temp4 = ((1 `shiftL` 224) - 1) `shiftL` 32 --
+      temp5 = temp4 `xor` 127                    --
+      temp6 = temp3 .&. temp5                    -- (Rightmost-byte AND with 127)
+      privnum = P25519 (temp6 .|. 64)
+  return (PrivateNum privnum, PublicNum $ (ax (affinify (pMult privnum (PointProj curve25519Gx undefined 1)))))
+
+-- | Calculate the shared secret.
+calculateSecretEC25519 :: PrivateNum P25519
+                       -> PublicNum P25519
+                       -> SharedSecret P25519
+calculateSecretEC25519 (PrivateNum priv) (PublicNum e) =
+  SharedSecret $ (ax (affinify (pMult priv (PointProj e undefined 1))))
