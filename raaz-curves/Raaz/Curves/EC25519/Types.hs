@@ -23,7 +23,6 @@ module Raaz.Curves.EC25519.Types
        ) where
 
 import Raaz.Curves.P25519.Internal
-import Raaz.Number.Internals
 import Data.Bits ()
 
 ----------------------------- EC25519 -------------------------------------------
@@ -34,7 +33,7 @@ data EC25519 w = EC25519 deriving (Eq, Show)
 curve25519L :: Integer
 curve25519L  = 256
 
-curve25519P :: Word256
+curve25519P :: Integer
 curve25519P  = 57896044618658097711785492504343953926634992332820282019728792003956564819949 -- (2^255 - 19)
 
 curve25519A :: P25519
@@ -49,25 +48,17 @@ curve25519C  = P25519 121665
 curve25519Gx :: P25519
 curve25519Gx  = P25519 9
 
-curve25519Q :: Word256
-curve25519Q  = 57896044618658097711785492504343953926856930875039260848015607506283634007912 -- 8 * (2^252 + 27742317777372353535851937790883648493)
+curve25519Q :: Integer
+curve25519Q  = 7237005577332262213973186563042994240857116359379907606001950938285454250989 -- (2^252 + 27742317777372353535851937790883648493)
 
-data PointAffine w = PointAffine { ax :: w, ay :: w} deriving Show
-data PointProj w   = PointProj { px :: w, py :: w, pz :: w} deriving Show
+data PointAffine w = PointAffine { ax :: w} deriving Show
+data PointProj w   = PointProj { px :: w, pz :: w} deriving Show
 
 instance Eq w => Eq (PointAffine w) where
-  (PointAffine x y) == (PointAffine x' y') = (x == x' && y == y')
+  (PointAffine x) == (PointAffine x') = (x == x')
 
 instance Eq w => Eq (PointProj w) where
-  (PointProj x y z) == (PointProj x' y' z') = (x == x' && y == y' && z == z')
+  (PointProj x z) == (PointProj x' z') = (x == x' && z == z')
 
 pInfinity :: PointProj P25519
-pInfinity = PointProj 1 undefined 0
-
---class ECclass ec where
---  data Point ec  :: *
---  pAdd       :: Point ec -> Point ec -> Point ec
---  pDouble    :: Point ec -> Point ec
---  pMult      :: Bits a   => a -> Point ec -> Point ec
---  affinify   :: Point ec -> Point ec
---  projectify :: Point ec -> Point ec
+pInfinity = PointProj 1 0

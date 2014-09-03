@@ -27,7 +27,7 @@ import Data.Bits
 --instance ECclass (EC25519 P25519) where
 --  type Point (EC25519 P25519) = (PointProj P25519)
 pDouble :: (PointProj P25519) -> (PointProj P25519)
-pDouble (PointProj x1 _ z1) = (PointProj x2 undefined z2)
+pDouble (PointProj x1 z1) = (PointProj x2 z2)
   where
     m = (x1 + z1) * (x1 + z1)
     n = (x1 - z1) * (x1 - z1)
@@ -37,9 +37,9 @@ pDouble (PointProj x1 _ z1) = (PointProj x2 undefined z2)
     z2 = r * s
 
 pAdd :: (PointProj P25519) -> (PointProj P25519) -> (PointProj P25519)
-pAdd point1@(PointProj x1 _ z1) point2@(PointProj x2 _ z2)
+pAdd point1@(PointProj x1 z1) point2@(PointProj x2 z2)
   | (point1 == point2) = pDouble point1
-  | otherwise = (PointProj x3 undefined z3)
+  | otherwise = (PointProj x3 z3)
   where
     m = ((x1 + z1) * (x2 - z2))
     n = ((x1 - z1) * (x2 + z2))
@@ -63,13 +63,12 @@ pMult (P25519 k) point = montgom nbits pInfinity point
      where r0r1 = pAdd r0 r1
 
 affinify :: (PointProj P25519) -> (PointAffine P25519)
-affinify (PointProj x y z) = (PointAffine x1 y1)
+affinify (PointProj x z) = (PointAffine x1)
   where
     prime = curve25519P
     zinv = powModuloSlowSafe z (prime - 2)
 --    zinv = pz `modinv` prime
     x1 = (x * zinv)
-    y1 = (y * zinv)
     powModuloSlowSafe g k = operate nbits (1::P25519) g
       where
         nbits = numberOfBits k 0
@@ -85,7 +84,7 @@ affinify (PointProj x y z) = (PointAffine x1 y1)
          where r0r1 = r0*r1
 
 projectify :: (PointAffine P25519) -> (PointProj P25519)
-projectify (PointAffine x y) = (PointProj x y 1)
+projectify (PointAffine x) = (PointProj x 1)
 
 -- | Generates the private number x (1 < x < q) and public number scalar multiple of basepoint.
 generateParamsEC25519 :: ( StreamGadget g )
@@ -100,11 +99,11 @@ generateParamsEC25519 rsrc = do
       temp5 = temp4 `xor` 127                    --
       temp6 = temp3 .&. temp5                    -- (Rightmost-byte AND with 127)
       privnum = P25519 (temp6 .|. 64)
-  return (PrivateNum privnum, PublicNum $ (ax (affinify (pMult privnum (PointProj curve25519Gx undefined 1)))))
+  return (PrivateNum privnum, PublicNum $ (ax (affinify (pMult privnum (PointProj curve25519Gx 1)))))
 
 -- | Calculate the shared secret.
 calculateSecretEC25519 :: PrivateNum P25519
                        -> PublicNum P25519
                        -> SharedSecret P25519
 calculateSecretEC25519 (PrivateNum priv) (PublicNum e) =
-  SharedSecret $ (ax (affinify (pMult priv (PointProj e undefined 1))))
+  SharedSecret $ (ax (affinify (pMult priv (PointProj e 1))))
