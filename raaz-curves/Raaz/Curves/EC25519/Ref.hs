@@ -36,19 +36,19 @@ pDouble (PointProj x1 z1) = (PointProj x2 z2)
     x2 = m * n
     z2 = r * s
 
-pAdd :: (PointProj P25519) -> (PointProj P25519) -> (PointProj P25519)
-pAdd point1@(PointProj x1 z1) point2@(PointProj x2 z2)
+pAdd :: (PointProj P25519) -> (PointProj P25519) -> (PointProj P25519) -> (PointProj P25519)
+pAdd basepoint point1@(PointProj x1 z1) point2@(PointProj x2 z2)
   | (point1 == point2) = pDouble point1
   | otherwise = (PointProj x3 z3)
   where
-    m = ((x1 + z1) * (x2 - z2))
-    n = ((x1 - z1) * (x2 + z2))
+    m  = ((x1 + z1) * (x2 - z2))
+    n  = ((x1 - z1) * (x2 + z2))
     x3 = ((m + n) * (m + n))
-    e = ((m - n) * (m - n))
-    z3 = (e * curve25519Gx)
+    e  = ((m - n) * (m - n))
+    z3 = (e * (px basepoint))
 
 pMult :: P25519 -> (PointProj P25519) -> (PointProj P25519)
-pMult (P25519 k) point = montgom nbits pInfinity point
+pMult (P25519 k) basepoint = montgom nbits pInfinity basepoint
   where
     nbits = numberOfBits k 0
     numberOfBits n count
@@ -60,14 +60,13 @@ pMult (P25519 k) point = montgom nbits pInfinity point
                               in montgom (bitnum-1) r0r1 r1r1
      | otherwise = let r0r0 = pDouble r0
                    in montgom (bitnum-1) r0r0 r0r1
-     where r0r1 = pAdd r0 r1
+     where r0r1 = pAdd basepoint r0 r1
 
 affinify :: (PointProj P25519) -> (PointAffine P25519)
 affinify (PointProj x z) = (PointAffine x1)
   where
     prime = curve25519P
     zinv = powModuloSlowSafe z (prime - 2)
---    zinv = pz `modinv` prime
     x1 = (x * zinv)
     powModuloSlowSafe g k = operate nbits (1::P25519) g
       where
@@ -92,18 +91,28 @@ generateParamsEC25519 :: ( StreamGadget g )
                           -> IO (PrivateNum P25519, PublicNum P25519)
 generateParamsEC25519 rsrc = do
   xrandom <- genBetween rsrc 2 (curve25519Q - 1)
-  let temp1 = (248 `shiftL` 224)                 --
-      temp2 = temp1 .|. ((1 `shiftL` 224) - 1)   --
-      temp3 = xrandom .&. temp2                  -- (Leftmost-byte AND with 248)
-      temp4 = ((1 `shiftL` 224) - 1) `shiftL` 32 --
-      temp5 = temp4 `xor` 127                    --
-      temp6 = temp3 .&. temp5                    -- (Rightmost-byte AND with 127)
-      privnum = P25519 (temp6 .|. 64)
-  return (PrivateNum privnum, PublicNum $ (ax (affinify (pMult privnum (PointProj curve25519Gx 1)))))
+  let temp1 = (((1 `shiftL` 248) - 1) `shiftL` 8) + 248
+      -- temp1: (256 bit number with 248 1's followed by 248)
+      temp2 = xrandom .&. temp1
+      -- (Rightmost-byte `AND` with 248)
+      temp3 = (127 `shiftL` 248) .|. ((1 `shiftL` 248) - 1)
+      -- temp3: (256 bit number with 127 followed by 248 1's)
+      temp4 = temp2 .&. temp3
+      -- (Leftmost-byte `AND` with 127)
+      temp5 = (64 `shiftL` 248)
+      -- temp5: (256 bit number with 64 followed by 248 1's)
+      temp6 = temp4 .|. temp5
+      -- (Leftmost-byte `OR` with 64)
+      privnum = P25519 (temp6)
+      publicPoint = pMult privnum (PointProj curve25519Gx 1)
+      publicnum = ax (affinify publicPoint)
+  return (PrivateNum privnum, PublicNum publicnum)
 
 -- | Calculate the shared secret.
 calculateSecretEC25519 :: PrivateNum P25519
                        -> PublicNum P25519
                        -> SharedSecret P25519
-calculateSecretEC25519 (PrivateNum priv) (PublicNum e) =
-  SharedSecret $ (ax (affinify (pMult priv (PointProj e 1))))
+calculateSecretEC25519 (PrivateNum privnum) (PublicNum publicnum) =
+  SharedSecret sharednum
+    where sharedPoint = pMult privnum (PointProj publicnum 1)
+          sharednum   = ax (affinify sharedPoint)
