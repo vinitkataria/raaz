@@ -86,48 +86,42 @@ affinify (PointProj x z) = (PointAffine x1)
 projectify :: (PointAffine P25519) -> (PointProj P25519)
 projectify (PointAffine x) = (PointProj x 1)
 
+getSecretFromRandom :: Integer -> Integer
+getSecretFromRandom xrandom = temp6
+  where
+    temp1 = (((1 `shiftL` 248) - 1) `shiftL` 8) + 248
+    -- temp1: (256 bit number with 248 1's followed by 248)
+    temp2 = xrandom .&. temp1
+    -- (Rightmost-byte `AND` with 248)
+    temp3 = (127 `shiftL` 248) .|. ((1 `shiftL` 248) - 1)
+    -- temp3: (256 bit number with 127 followed by 248 1's)
+    temp4 = temp2 .&. temp3
+    -- (Leftmost-byte `AND` with 127)
+    temp5 = (64 `shiftL` 248)
+    -- temp5: (256 bit number with 64 followed by 248 1's)
+    temp6 = temp4 .|. temp5
+    -- (Leftmost-byte `OR` with 64)
+
 -- | Generates the private number x (1 < x < q) and public number scalar multiple of basepoint.
 generateParamsEC25519 :: ( StreamGadget g )
                           => RandomSource g
                           -> IO (PrivateNum P25519, PublicNum P25519)
 generateParamsEC25519 rsrc = do
   xrandom <- genBetween rsrc 2 (curve25519Q - 1)
-  let temp1 = (((1 `shiftL` 248) - 1) `shiftL` 8) + 248
-      -- temp1: (256 bit number with 248 1's followed by 248)
-      temp2 = xrandom .&. temp1
-      -- (Rightmost-byte `AND` with 248)
-      temp3 = (127 `shiftL` 248) .|. ((1 `shiftL` 248) - 1)
-      -- temp3: (256 bit number with 127 followed by 248 1's)
-      temp4 = temp2 .&. temp3
-      -- (Leftmost-byte `AND` with 127)
-      temp5 = (64 `shiftL` 248)
-      -- temp5: (256 bit number with 64 followed by 248 1's)
-      temp6 = temp4 .|. temp5
-      -- (Leftmost-byte `OR` with 64)
-      privnum = P25519 (temp6)
+  let privnum = P25519 (getSecretFromRandom xrandom)
       publicPoint = pMult privnum (PointProj curve25519Gx 1)
       publicnum = ax (affinify publicPoint)
   return (PrivateNum privnum, PublicNum publicnum)
 
+
 -- | Given a random number, generates the private number x (1 < x < q) and public number scalar multiple of basepoint.
 generateParamsEC25519Random :: P25519
-                          -> (PrivateNum P25519, PublicNum P25519)
+                           -> (PrivateNum P25519, PublicNum P25519)
 generateParamsEC25519Random (P25519 xrandom) = (PrivateNum privnum, PublicNum publicnum)
-  where temp1 = (((1 `shiftL` 248) - 1) `shiftL` 8) + 248
-        -- temp1: (256 bit number with 248 1's followed by 248)
-        temp2 = xrandom .&. temp1
-        -- (Rightmost-byte `AND` with 248)
-        temp3 = (127 `shiftL` 248) .|. ((1 `shiftL` 248) - 1)
-        -- temp3: (256 bit number with 127 followed by 248 1's)
-        temp4 = temp2 .&. temp3
-        -- (Leftmost-byte `AND` with 127)
-        temp5 = (64 `shiftL` 248)
-        -- temp5: (256 bit number with 64 followed by 248 1's)
-        temp6 = temp4 .|. temp5
-        -- (Leftmost-byte `OR` with 64)
-        privnum = P25519 (temp6)
-        publicPoint = pMult privnum (PointProj curve25519Gx 1)
-        publicnum = ax (affinify publicPoint)
+  where
+    privnum = P25519 (getSecretFromRandom xrandom)
+    publicPoint = pMult privnum (PointProj curve25519Gx 1)
+    publicnum = ax (affinify publicPoint)
 
 -- | Calculate the shared secret.
 calculateSecretEC25519 :: PrivateNum P25519

@@ -1,4 +1,5 @@
 {-# LANGUAGE ForeignFunctionInterface #-}
+{-# OPTIONS_GHC -fno-warn-orphans     #-}
 {-# CFILES raaz/curves/cportable/curve25519-donna-c64.c #-}
 
 module Raaz.Curves.EC25519.CPortable
@@ -26,7 +27,8 @@ import Raaz.KeyExchange
 --import Data.ByteString.Unsafe   as SU
 --import Data.Word
 
-foreign import ccall unsafe "curve25519-donna-c64.h curve25519_donna"
+foreign import ccall unsafe
+  "curve25519-donna-c64.c curve25519_donna"
   c_curve25519_donna :: Ptr CUChar -> Ptr CUChar -> Ptr CUChar -> IO CInt
 
 getSecretFromRandom :: P25519 -> P25519
@@ -48,7 +50,7 @@ getSecretFromRandom (P25519 xrandom) = privnum
 
 cGenerateParamsEC25519 :: P25519 -> IO (PrivateNum P25519, PublicNum P25519)
 cGenerateParamsEC25519 (P25519 randomnum) = do
-  let getList 0 list   = list
+  let getList 0 list   = list ++ (replicate (32 - length list) 0)
       getList n list   = getList (n `shiftR` 8) (list ++ [n .&. 255])
       getcuCharList    = map (castCharToCUChar . chr . fromIntegral)
       secretList       = getcuCharList $ (getList randomnum [])
@@ -62,7 +64,7 @@ cGenerateParamsEC25519 (P25519 randomnum) = do
   let getIntegerList = map (toInteger . ord . castCUCharToChar)
       addInt num d = 256*num + d
       integerFromList = foldl addInt 0
-      getInteger = integerFromList . getIntegerList
+      getInteger = integerFromList . reverse . getIntegerList
       privnum = getSecretFromRandom (P25519 randomnum)
       publicnum = P25519 $ getInteger pubkey
   return (PrivateNum privnum, PublicNum publicnum)
@@ -86,6 +88,6 @@ cCalculateSecretEC25519 (PrivateNum privnum) (PublicNum publicnum) = do
   let getIntegerList = map (toInteger . ord . castCUCharToChar)
       addInt num d = 256*num + d
       integerFromList = foldl addInt 0
-      getInteger = integerFromList . getIntegerList
+      getInteger = integerFromList . reverse . getIntegerList
       sharedsecret = P25519 $ getInteger sharedkey
   return (SharedSecret sharedsecret)
