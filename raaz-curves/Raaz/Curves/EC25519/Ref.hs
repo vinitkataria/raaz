@@ -13,6 +13,7 @@ module Raaz.Curves.EC25519.Ref
        , affinify
        , projectify
        , generateParamsEC25519
+       , generateParamsEC25519Random
        , calculateSecretEC25519
        ) where
 
@@ -107,6 +108,26 @@ generateParamsEC25519 rsrc = do
       publicPoint = pMult privnum (PointProj curve25519Gx 1)
       publicnum = ax (affinify publicPoint)
   return (PrivateNum privnum, PublicNum publicnum)
+
+-- | Given a random number, generates the private number x (1 < x < q) and public number scalar multiple of basepoint.
+generateParamsEC25519Random :: P25519
+                          -> (PrivateNum P25519, PublicNum P25519)
+generateParamsEC25519Random (P25519 xrandom) = (PrivateNum privnum, PublicNum publicnum)
+  where temp1 = (((1 `shiftL` 248) - 1) `shiftL` 8) + 248
+        -- temp1: (256 bit number with 248 1's followed by 248)
+        temp2 = xrandom .&. temp1
+        -- (Rightmost-byte `AND` with 248)
+        temp3 = (127 `shiftL` 248) .|. ((1 `shiftL` 248) - 1)
+        -- temp3: (256 bit number with 127 followed by 248 1's)
+        temp4 = temp2 .&. temp3
+        -- (Leftmost-byte `AND` with 127)
+        temp5 = (64 `shiftL` 248)
+        -- temp5: (256 bit number with 64 followed by 248 1's)
+        temp6 = temp4 .|. temp5
+        -- (Leftmost-byte `OR` with 64)
+        privnum = P25519 (temp6)
+        publicPoint = pMult privnum (PointProj curve25519Gx 1)
+        publicnum = ax (affinify publicPoint)
 
 -- | Calculate the shared secret.
 calculateSecretEC25519 :: PrivateNum P25519
