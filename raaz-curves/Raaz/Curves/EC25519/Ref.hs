@@ -21,7 +21,6 @@ import Raaz.Curves.EC25519.Types
 import Raaz.Curves.P25519.Internal
 import Raaz.Core.Primitives.Cipher
 import Raaz.Random
-import Raaz.KeyExchange
 
 import Data.Bits
 
@@ -127,7 +126,8 @@ generateParamsEC25519Random (P25519 xrandom) = (PrivateNum privnum, PublicNum pu
 calculateSecretEC25519 :: PrivateNum P25519
                        -> PublicNum P25519
                        -> SharedSecret P25519
-calculateSecretEC25519 (PrivateNum privnum) (PublicNum publicnum) =
-  SharedSecret sharednum
-    where sharedPoint = pMult privnum (PointProj publicnum 1)
+calculateSecretEC25519 (PrivateNum privnum) (PublicNum publicnum) = SharedSecret sharednum
+    where (P25519 privint) = privnum
+          secret = getSecretFromRandom privint
+          sharedPoint = pMult (P25519 secret) (PointProj publicnum 1)
           sharednum   = ax (affinify sharedPoint)

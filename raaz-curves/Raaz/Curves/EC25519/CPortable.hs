@@ -9,6 +9,7 @@ module Raaz.Curves.EC25519.CPortable
 
 import Data.Bits
 import Data.Char
+import Numeric
 
 import Foreign.Ptr
 import Foreign.C.Types
@@ -21,7 +22,6 @@ import Foreign.Marshal.Array
 
 import Raaz.Curves.EC25519.Types
 import Raaz.Curves.P25519.Internal
-import Raaz.KeyExchange
 
 --import Data.ByteString.Internal as SI
 --import Data.ByteString.Unsafe   as SU
@@ -67,13 +67,14 @@ cGenerateParamsEC25519 (P25519 randomnum) = do
       getInteger = integerFromList . reverse . getIntegerList
       privnum = getSecretFromRandom (P25519 randomnum)
       publicnum = P25519 $ getInteger pubkey
+  --putStrLn $ showHex publicnum ""
   return (PrivateNum privnum, PublicNum publicnum)
 
 cCalculateSecretEC25519 :: PrivateNum P25519
                        -> PublicNum P25519
                        -> IO (SharedSecret P25519)
 cCalculateSecretEC25519 (PrivateNum privnum) (PublicNum publicnum) = do
-  let getList 0 list     = list
+  let getList 0 list     = list ++ (replicate (32 - length list) 0)
       getList n list     = getList (n `shiftR` 8) (list ++ [n .&. 255])
       getcuCharList      = map (castCharToCUChar . chr . fromIntegral)
       (P25519 secretnum) = privnum
@@ -90,4 +91,5 @@ cCalculateSecretEC25519 (PrivateNum privnum) (PublicNum publicnum) = do
       integerFromList = foldl addInt 0
       getInteger = integerFromList . reverse . getIntegerList
       sharedsecret = P25519 $ getInteger sharedkey
+  --putStrLn $ showHex sharedsecret ""
   return (SharedSecret sharedsecret)
