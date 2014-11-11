@@ -21,15 +21,14 @@ module Raaz.Curves.EC25519.Types
        , pInfinity
        , PointAffine(..)
        , PointProj(..)
-       , PublicNum(..)
-       , PrivateNum(..)
-       , SharedSecret(..)
+       , Secret25519(..)
+       , PublicToken25519(..)
+       , SharedSecret25519(..)
        ) where
 
 import Raaz.Curves.P25519.Internal
 import Data.Bits ()
 import Foreign.Storable
-
 
 ----------------------------- EC25519 -------------------------------------------
 -- Montgomery curve equation : by^2 = x^3 + ax^2 + x, p = prime, g = basepoint
@@ -69,14 +68,14 @@ instance Eq w => Eq (PointProj w) where
 pInfinity :: PointProj P25519
 pInfinity = PointProj 1 0
 
+-- | Secret
+newtype Secret25519 w = Secret25519 w
+                    deriving (Show, Eq, Ord, Num, Integral, Storable, Real, Enum)
+
+-- | Public Token
+newtype PublicToken25519 w = PublicToken25519 w
+                    deriving (Show, Eq, Ord, Num, Integral, Storable, Real, Enum)
+
 -- | Shared Secret
-newtype SharedSecret w = SharedSecret w
+newtype SharedSecret25519 w = SharedSecret25519 w
                        deriving (Show, Eq, Ord, Num, Integral, Storable, Real, Enum)
-
--- | Public key
-newtype PublicNum w = PublicNum w
-                    deriving (Show, Eq, Ord, Num, Integral, Storable, Real, Enum)
-
--- | Private key
-newtype PrivateNum w = PrivateNum w
-                    deriving (Show, Eq, Ord, Num, Integral, Storable, Real, Enum)

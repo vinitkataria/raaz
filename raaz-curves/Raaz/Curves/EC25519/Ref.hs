@@ -3,6 +3,7 @@
 This module gives the reference implementation of the curve EC25519.
 
 -}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -14,18 +15,33 @@ module Raaz.Curves.EC25519.Ref
        , projectify
        , generateParamsEC25519
        , generateParamsEC25519Random
-       , calculateSecretEC25519
+       , calculateSharedSecretEC25519
        ) where
 
 import Raaz.Curves.EC25519.Types
 import Raaz.Curves.P25519.Internal
 import Raaz.Core.Primitives.Cipher
 import Raaz.Random
+import Raaz.Core.DH
 
 import Data.Bits
 
---instance ECclass (EC25519 P25519) where
---  type Point (EC25519 P25519) = (PointProj P25519)
+instance DH P25519 where
+  type Secret P25519 = Secret25519 P25519
+  type PublicToken P25519 = PublicToken25519 P25519
+  type SharedSecret P25519 = SharedSecret25519 P25519
+
+  publicToken _ (Secret25519 secret) = PublicToken25519 pubToken
+    where
+      publicPoint = pMult secret (PointProj curve25519Gx 1)
+      pubToken = ax (affinify publicPoint)
+
+  sharedSecret _ (Secret25519 secret) (PublicToken25519 pubToken) = SharedSecret25519 sharednum
+    where
+
+      sharedPoint = pMult secret (PointProj pubToken 1)
+      sharednum   = ax (affinify sharedPoint)
+
 pDouble :: (PointProj P25519) -> (PointProj P25519)
 pDouble (PointProj x1 z1) = (PointProj x2 z2)
   where
@@ -104,30 +120,30 @@ getSecretFromRandom xrandom = temp6
 -- | Generates the private number x (1 < x < q) and public number scalar multiple of basepoint.
 generateParamsEC25519 :: ( StreamGadget g )
                           => RandomSource g
-                          -> IO (PrivateNum P25519, PublicNum P25519)
+                          -> IO (Secret25519 P25519, PublicToken25519 P25519)
 generateParamsEC25519 rsrc = do
   xrandom <- genBetween rsrc 2 (curve25519Q - 1)
   let privnum = P25519 (getSecretFromRandom xrandom)
       publicPoint = pMult privnum (PointProj curve25519Gx 1)
-      publicnum = ax (affinify publicPoint)
-  return (PrivateNum privnum, PublicNum publicnum)
+      pubToken = ax (affinify publicPoint)
+  return (Secret25519 privnum, PublicToken25519 pubToken)
 
 
 -- | Given a random number, generates the private number x (1 < x < q) and public number scalar multiple of basepoint.
 generateParamsEC25519Random :: P25519
-                           -> (PrivateNum P25519, PublicNum P25519)
-generateParamsEC25519Random (P25519 xrandom) = (PrivateNum privnum, PublicNum publicnum)
+                           -> (Secret25519 P25519, PublicToken25519 P25519)
+generateParamsEC25519Random (P25519 xrandom) = (Secret25519 privnum, PublicToken25519 pubToken)
   where
     privnum = P25519 (getSecretFromRandom xrandom)
     publicPoint = pMult privnum (PointProj curve25519Gx 1)
-    publicnum = ax (affinify publicPoint)
+    pubToken = ax (affinify publicPoint)
 
 -- | Calculate the shared secret.
-calculateSecretEC25519 :: PrivateNum P25519
-                       -> PublicNum P25519
-                       -> SharedSecret P25519
-calculateSecretEC25519 (PrivateNum privnum) (PublicNum publicnum) = SharedSecret sharednum
+calculateSharedSecretEC25519 :: Secret25519 P25519
+                             -> PublicToken25519 P25519
+                             -> SharedSecret P25519
+calculateSharedSecretEC25519 (Secret25519 privnum) (PublicToken25519 pubToken) = SharedSecret25519 sharednum
     where (P25519 privint) = privnum
           secret = getSecretFromRandom privint
-          sharedPoint = pMult (P25519 secret) (PointProj publicnum 1)
+          sharedPoint = pMult (P25519 secret) (PointProj pubToken 1)
           sharednum   = ax (affinify sharedPoint)

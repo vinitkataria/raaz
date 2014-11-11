@@ -9,23 +9,15 @@ module Raaz.Curves.EC25519.CPortable
 
 import Data.Bits
 import Data.Char
-import Numeric
+import Numeric ()
 
 import Foreign.Ptr
 import Foreign.C.Types
 import Foreign.C.String
---import Foreign.ForeignPtr hiding (unsafeForeignPtrToPtr)
---import Foreign.ForeignPtr.Unsafe
 import Foreign.Marshal.Array
-
---import System.Entropy
 
 import Raaz.Curves.EC25519.Types
 import Raaz.Curves.P25519.Internal
-
---import Data.ByteString.Internal as SI
---import Data.ByteString.Unsafe   as SU
---import Data.Word
 
 foreign import ccall unsafe
   "curve25519-donna-c64.c curve25519_donna"
@@ -48,7 +40,7 @@ getSecretFromRandom (P25519 xrandom) = privnum
     -- (Leftmost-byte `OR` with 64)
     privnum = P25519 (temp6)
 
-cGenerateParamsEC25519 :: P25519 -> IO (PrivateNum P25519, PublicNum P25519)
+cGenerateParamsEC25519 :: P25519 -> IO (Secret25519 P25519, PublicToken25519 P25519)
 cGenerateParamsEC25519 (P25519 randomnum) = do
   let getList 0 list   = list ++ (replicate (32 - length list) 0)
       getList n list   = getList (n `shiftR` 8) (list ++ [n .&. 255])
@@ -68,12 +60,12 @@ cGenerateParamsEC25519 (P25519 randomnum) = do
       privnum = getSecretFromRandom (P25519 randomnum)
       publicnum = P25519 $ getInteger pubkey
   --putStrLn $ showHex publicnum ""
-  return (PrivateNum privnum, PublicNum publicnum)
+  return (Secret25519 privnum, PublicToken25519 publicnum)
 
-cCalculateSecretEC25519 :: PrivateNum P25519
-                       -> PublicNum P25519
-                       -> IO (SharedSecret P25519)
-cCalculateSecretEC25519 (PrivateNum privnum) (PublicNum publicnum) = do
+cCalculateSecretEC25519 :: Secret25519 P25519
+                       -> PublicToken25519 P25519
+                       -> IO (SharedSecret25519 P25519)
+cCalculateSecretEC25519 (Secret25519 privnum) (PublicToken25519 publicnum) = do
   let getList 0 list     = list ++ (replicate (32 - length list) 0)
       getList n list     = getList (n `shiftR` 8) (list ++ [n .&. 255])
       getcuCharList      = map (castCharToCUChar . chr . fromIntegral)
@@ -92,4 +84,4 @@ cCalculateSecretEC25519 (PrivateNum privnum) (PublicNum publicnum) = do
       getInteger = integerFromList . reverse . getIntegerList
       sharedsecret = P25519 $ getInteger sharedkey
   --putStrLn $ showHex sharedsecret ""
-  return (SharedSecret sharedsecret)
+  return (SharedSecret25519 sharedsecret)
