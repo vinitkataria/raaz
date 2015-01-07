@@ -43,8 +43,8 @@ prop_gensharedsecret25519 :: Param2 -> Bool
 prop_gensharedsecret25519 (Param2 random1 random2) = priv1 == priv2 && pub1 == pub2 && sharedSecret1 == sharedSecret2
   where (priv1, pub1) = generateParamsEC25519Random (P25519 random1)
         (priv2, pub2) = unsafePerformIO $ cGenerateParamsEC25519 (P25519 random1)
-        sharedSecret1 = calculateSecretEC25519 (PrivateNum (P25519 random2)) pub1
-        sharedSecret2 = unsafePerformIO $ cCalculateSecretEC25519 (PrivateNum (P25519 random2)) pub2
+        sharedSecret1 = calculateSharedSecretEC25519 (Secret25519 (P25519 random2)) pub1
+        sharedSecret2 = unsafePerformIO $ cCalculateSecretEC25519 (Secret25519 (P25519 random2)) pub2
 
 tests = [ testProperty "Generate Params Test" prop_genparams25519
         , testProperty "Generate SharedSecret Test" prop_gensharedsecret25519
