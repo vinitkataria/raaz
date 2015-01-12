@@ -21,10 +21,13 @@ module Raaz.Curves.EC25519.Ref
 import Raaz.Curves.EC25519.Types
 import Raaz.Curves.P25519.Internal
 import Raaz.Core.Primitives.Cipher
+import Raaz.Core.Random
+import Raaz.Number
 import Raaz.Random
 import Raaz.Core.DH
 
 import Data.Bits
+import System.IO.Unsafe (unsafePerformIO)
 
 instance DH P25519 where
   type Secret P25519 = Secret25519 P25519
@@ -38,7 +41,6 @@ instance DH P25519 where
 
   sharedSecret _ (Secret25519 secret) (PublicToken25519 pubToken) = SharedSecret25519 sharednum
     where
-
       sharedPoint = pMult secret (PointProj pubToken 1)
       sharednum   = ax (affinify sharedPoint)
 
@@ -118,15 +120,15 @@ getSecretFromRandom xrandom = temp6
     -- (Leftmost-byte `OR` with 64)
 
 -- | Generates the private number x (1 < x < q) and public number scalar multiple of basepoint.
-generateParamsEC25519 :: ( StreamGadget g )
-                          => RandomSource g
-                          -> IO (Secret25519 P25519, PublicToken25519 P25519)
-generateParamsEC25519 rsrc = do
-  xrandom <- genBetween rsrc 2 (curve25519Q - 1)
-  let privnum = P25519 (getSecretFromRandom xrandom)
-      publicPoint = pMult privnum (PointProj curve25519Gx 1)
-      pubToken = ax (affinify publicPoint)
-  return (Secret25519 privnum, PublicToken25519 pubToken)
+generateParamsEC25519 :: DevRandom
+                      -> (Secret25519 P25519, PublicToken25519 P25519)
+generateParamsEC25519 rsrc = (Secret25519 privnum, PublicToken25519 pubToken)
+  where
+    randomWord256 = unsafePerformIO $ ((getRandomWord256From rsrc) :: IO Word256)
+    randomInteger = (fromIntegral randomWord256) :: Integer
+    privnum = P25519 (getSecretFromRandom randomInteger)
+    publicPoint = pMult privnum (PointProj curve25519Gx 1)
+    pubToken = ax (affinify publicPoint)
 
 
 -- | Given a random number, generates the private number x (1 < x < q) and public number scalar multiple of basepoint.
