@@ -13,36 +13,21 @@ module Raaz.Curves.EC25519.Ref
        , pMult
        , affinify
        , projectify
-       , generateParamsEC25519
-       , generateParamsEC25519Random
-       , calculateSharedSecretEC25519
+       , getEntropyP25519
+       , getPseudoRandomP25519
+       , generateSecretEC25519
+       , publicToken
+       , sharedSecret
+       , Secret25519
+       , PublicToken25519
        ) where
 
 import Raaz.Curves.EC25519.Types
 import Raaz.Curves.P25519.Internal
-import Raaz.Core.Primitives.Cipher
 import Raaz.Core.Random
-import Raaz.Number
-import Raaz.Random
-import Raaz.Core.DH
+--import Raaz.Core.DH
 
 import Data.Bits
-import System.IO.Unsafe (unsafePerformIO)
-
-instance DH P25519 where
-  type Secret P25519 = Secret25519 P25519
-  type PublicToken P25519 = PublicToken25519 P25519
-  type SharedSecret P25519 = SharedSecret25519 P25519
-
-  publicToken _ (Secret25519 secret) = PublicToken25519 pubToken
-    where
-      publicPoint = pMult secret (PointProj curve25519Gx 1)
-      pubToken = ax (affinify publicPoint)
-
-  sharedSecret _ (Secret25519 secret) (PublicToken25519 pubToken) = SharedSecret25519 sharednum
-    where
-      sharedPoint = pMult secret (PointProj pubToken 1)
-      sharednum   = ax (affinify sharedPoint)
 
 pDouble :: (PointProj P25519) -> (PointProj P25519)
 pDouble (PointProj x1 z1) = (PointProj x2 z2)
@@ -103,6 +88,16 @@ affinify (PointProj x z) = (PointAffine x1)
 projectify :: (PointAffine P25519) -> (PointProj P25519)
 projectify (PointAffine x) = (PointProj x 1)
 
+getEntropyP25519 :: IO P25519
+getEntropyP25519 = do
+  src <- openEntropy
+  gen src
+
+getPseudoRandomP25519 :: IO P25519
+getPseudoRandomP25519 = do
+  src <- openPseudoRandom
+  gen src
+
 getSecretFromRandom :: Integer -> Integer
 getSecretFromRandom xrandom = temp6
   where
@@ -119,33 +114,21 @@ getSecretFromRandom xrandom = temp6
     temp6 = temp4 .|. temp5
     -- (Leftmost-byte `OR` with 64)
 
--- | Generates the private number x (1 < x < q) and public number scalar multiple of basepoint.
-generateParamsEC25519 :: DevRandom
-                      -> (Secret25519 P25519, PublicToken25519 P25519)
-generateParamsEC25519 rsrc = (Secret25519 privnum, PublicToken25519 pubToken)
+-- | Given a random number, generates the private number x (1 < x < q)
+generateSecretEC25519 :: P25519 -> Secret25519 P25519
+generateSecretEC25519 (P25519 randomNum) = (Secret25519 $ P25519 (getSecretFromRandom randomNum))
+
+--instance DH P25519 where
+--  type Secret P25519 = Secret25519 P25519
+--  type PublicToken P25519 = PublicToken25519 P25519
+--  type SharedSecret P25519 = SharedSecret25519 P25519
+
+publicToken _ (Secret25519 secret) = PublicToken25519 pubToken
   where
-    randomWord256 = unsafePerformIO $ ((getRandomWord256From rsrc) :: IO Word256)
-    randomInteger = (fromIntegral randomWord256) :: Integer
-    privnum = P25519 (getSecretFromRandom randomInteger)
-    publicPoint = pMult privnum (PointProj curve25519Gx 1)
+    publicPoint = pMult secret (PointProj curve25519Gx 1)
     pubToken = ax (affinify publicPoint)
 
-
--- | Given a random number, generates the private number x (1 < x < q) and public number scalar multiple of basepoint.
-generateParamsEC25519Random :: P25519
-                           -> (Secret25519 P25519, PublicToken25519 P25519)
-generateParamsEC25519Random (P25519 xrandom) = (Secret25519 privnum, PublicToken25519 pubToken)
+sharedSecret _ (Secret25519 secret) (PublicToken25519 pubToken) = SharedSecret25519 sharednum
   where
-    privnum = P25519 (getSecretFromRandom xrandom)
-    publicPoint = pMult privnum (PointProj curve25519Gx 1)
-    pubToken = ax (affinify publicPoint)
-
--- | Calculate the shared secret.
-calculateSharedSecretEC25519 :: Secret25519 P25519
-                             -> PublicToken25519 P25519
-                             -> SharedSecret P25519
-calculateSharedSecretEC25519 (Secret25519 privnum) (PublicToken25519 pubToken) = SharedSecret25519 sharednum
-    where (P25519 privint) = privnum
-          secret = getSecretFromRandom privint
-          sharedPoint = pMult (P25519 secret) (PointProj pubToken 1)
-          sharednum   = ax (affinify sharedPoint)
+    sharedPoint = pMult secret (PointProj pubToken 1)
+    sharednum   = ax (affinify sharedPoint)

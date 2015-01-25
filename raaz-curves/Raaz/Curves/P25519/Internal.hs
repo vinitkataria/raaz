@@ -14,8 +14,12 @@ module Raaz.Curves.P25519.Internal
 
 import Data.Bits
 import Data.Typeable
-
+import Foreign.Marshal (allocaBytes)
+import Foreign.Ptr (castPtr)
+import Foreign.Storable (peek, Storable)
+import System.IO (hGetBuf)
 import Raaz.Number
+import Raaz.Core.Random
 
 -- | Modulo Prime 2^255 - 19
 newtype P25519 = P25519 Integer
@@ -50,3 +54,9 @@ instance Enum P25519 where
          | otherwise     = error "pred: P25519"
   toEnum                 = P25519 . toEnum
   fromEnum (P25519 a)    = fromEnum a
+
+instance Random P25519 where
+  gen (RandomDev handle) = allocaBytes 32 $ \buf -> do
+  _ <- hGetBuf handle buf 32
+  word256 <- ((peek (castPtr buf)) :: IO Word256)
+  return $ P25519 ((fromIntegral word256) :: Integer)
