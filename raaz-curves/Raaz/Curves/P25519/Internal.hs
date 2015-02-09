@@ -5,6 +5,7 @@ Type for the prime P25519.
 -}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE InstanceSigs               #-}
 {-# LANGUAGE BangPatterns               #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
 {-# LANGUAGE CPP                        #-}
@@ -42,7 +43,7 @@ import Foreign.Marshal (allocaBytes)
 import Foreign.Ptr (castPtr)
 import Foreign.Storable (peek, Storable)
 import System.IO (hGetBuf)
-import Raaz.Number
+import Raaz.Number (Modular(..), Word256)
 import Raaz.Core.DH
 import Raaz.Core.Random
 --import Raaz.Curves.EC25519.Types
@@ -85,8 +86,6 @@ instance Eq w => Eq (PointProj w) where
 pInfinity :: PointProj P25519
 pInfinity = PointProj 1 0
 
-
-
 -- | Modulo Prime 2^255 - 19
 newtype P25519 = P25519 Integer
                   deriving (Integral, Show, Ord, Real, Modular, Typeable, Eq)
@@ -123,14 +122,14 @@ instance Enum P25519 where
 
 instance Random P25519 where
   gen (RandomDev handle) = allocaBytes 32 $ \buf -> do
-  void $ hGetBuf handle buf 32
-  word256 <- ((peek (castPtr buf)) :: IO Word256)
-  return $ P25519 ((fromIntegral word256) :: Integer)
+    void $ hGetBuf handle buf 32
+    word256 <- ((peek (castPtr buf)) :: IO Word256)
+    return $ P25519 ((fromIntegral word256) :: Integer)
 
 instance DH P25519 where
-  type Secret P25519 = Secret25519 P25519
-  type PublicToken P25519 = PublicToken25519 P25519
-  type SharedSecret P25519 = SharedSecret25519 P25519
+  type Secret P25519 = Secret25519
+  type PublicToken P25519 = PublicToken25519
+  type SharedSecret P25519 = SharedSecret25519
 
   publicToken _ (Secret25519 secret) = PublicToken25519 pubToken
     where
@@ -200,17 +199,18 @@ affinify (PointProj x z) = (PointAffine x1)
 
 projectify :: (PointAffine P25519) -> (PointProj P25519)
 projectify (PointAffine x) = (PointProj x 1)
+
 -- | Secret
-newtype Secret25519 w = Secret25519 w
-                    deriving (Show, Eq, Ord, Num, Integral, Storable, Real, Enum)
+newtype Secret25519 = Secret25519 P25519 deriving (Eq, Show)
+                    --deriving (Show, Eq, Ord, Num, Integral, Storable, Real, Enum)
 
 -- | Public Token
-newtype PublicToken25519 w = PublicToken25519 w
-                    deriving (Show, Eq, Ord, Num, Integral, Storable, Real, Enum)
+newtype PublicToken25519 = PublicToken25519 P25519 deriving (Eq, Show)
+                    --deriving (Show, Eq, Ord, Num, Integral, Storable, Real, Enum)
 
 -- | Shared Secret
-newtype SharedSecret25519 w = SharedSecret25519 w
-                       deriving (Show, Eq, Ord, Num, Integral, Storable, Real, Enum)
+newtype SharedSecret25519 = SharedSecret25519 P25519 deriving (Eq, Show)
+                       --deriving (Show, Eq, Ord, Num, Integral, Storable, Real, Enum)
 
 
 getEntropyP25519 :: IO P25519
@@ -240,5 +240,5 @@ getSecretFromRandom xrandom = temp6
     -- (Leftmost-byte `OR` with 64)
 
 -- | Given a random number, generates the private number x (1 < x < q)
-generateSecretEC25519 :: P25519 -> Secret25519 P25519
+generateSecretEC25519 :: P25519 -> Secret P25519
 generateSecretEC25519 (P25519 randomNum) = (Secret25519 $ P25519 (getSecretFromRandom randomNum))

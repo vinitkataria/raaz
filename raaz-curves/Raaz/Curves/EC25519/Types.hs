@@ -12,8 +12,5 @@ This module exposes the `EC25519` curve constructor.
 module Raaz.Curves.EC25519.Types
        () where
 
-import Data.Bits ()
-import Foreign.Storable
-
 --data EC25519 w = EC25519 deriving (Eq, Show)
 

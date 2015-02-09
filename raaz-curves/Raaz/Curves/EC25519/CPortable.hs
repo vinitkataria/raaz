@@ -16,7 +16,7 @@ import Foreign.C.Types
 import Foreign.C.String
 import Foreign.Marshal.Array
 
-import Raaz.Curves.EC25519.Types
+import Raaz.Curves.EC25519.Types()
 import Raaz.Curves.P25519.Internal
 
 foreign import ccall unsafe
@@ -40,7 +40,7 @@ getSecretFromRandom (P25519 xrandom) = privnum
     -- (Leftmost-byte `OR` with 64)
     privnum = P25519 (temp6)
 
-cGenerateParamsEC25519 :: P25519 -> IO (Secret25519 P25519, PublicToken25519 P25519)
+cGenerateParamsEC25519 :: P25519 -> IO (Secret25519, PublicToken25519)
 cGenerateParamsEC25519 (P25519 randomnum) = do
   let getList 0 list   = list ++ (replicate (32 - length list) 0)
       getList n list   = getList (n `shiftR` 8) (list ++ [n .&. 255])
@@ -62,9 +62,9 @@ cGenerateParamsEC25519 (P25519 randomnum) = do
   --putStrLn $ showHex publicnum ""
   return (Secret25519 privnum, PublicToken25519 publicnum)
 
-cCalculateSecretEC25519 :: Secret25519 P25519
-                       -> PublicToken25519 P25519
-                       -> IO (SharedSecret25519 P25519)
+cCalculateSecretEC25519 :: Secret25519
+                       -> PublicToken25519
+                       -> IO (SharedSecret25519)
 cCalculateSecretEC25519 (Secret25519 privnum) (PublicToken25519 publicnum) = do
   let getList 0 list     = list ++ (replicate (32 - length list) 0)
       getList n list     = getList (n `shiftR` 8) (list ++ [n .&. 255])

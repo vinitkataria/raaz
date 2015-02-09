@@ -15,6 +15,7 @@ import Raaz.Curves.EC25519.Types
 import Raaz.Curves.EC25519.Ref
 import Raaz.Curves.EC25519.CPortable
 import Raaz.Curves.P25519.Internal
+import Raaz.Core.DH
 import System.IO.Unsafe (unsafePerformIO)
 
 newtype Param = Param Integer deriving Show
@@ -37,16 +38,16 @@ instance Arbitrary Param2 where
 prop_genparams25519 :: Param -> Bool
 prop_genparams25519 (Param random) = priv1 == priv2 && pub1 == pub2
   where secret = generateSecretEC25519 (P25519 random)
-        (priv1, pub1) = (secret, publicToken undefined secret)
+        (priv1, pub1) = (secret, publicToken (undefined :: P25519) secret)
         (priv2, pub2) = unsafePerformIO $ cGenerateParamsEC25519 (P25519 random)
 
 prop_gensharedsecret25519 :: Param2 -> Bool
 prop_gensharedsecret25519 (Param2 random1 random2) = priv1 == priv2 && pub1 == pub2 && sharedSecret1 == sharedSecret2
   where secret1 = generateSecretEC25519 (P25519 random1)
-        (priv1, pub1) = (secret1, publicToken undefined secret1)
+        (priv1, pub1) = (secret1, publicToken (undefined :: P25519) secret1)
         (priv2, pub2) = unsafePerformIO $ cGenerateParamsEC25519 (P25519 random1)
         secret2 = generateSecretEC25519 (P25519 random2)
-        sharedSecret1 = sharedSecret undefined secret2 pub1
+        sharedSecret1 = sharedSecret (undefined :: P25519) secret2 pub1
         sharedSecret2 = unsafePerformIO $ cCalculateSecretEC25519 (Secret25519 (P25519 random2)) pub2
 
 tests = [ testProperty "Generate Params Test" prop_genparams25519
