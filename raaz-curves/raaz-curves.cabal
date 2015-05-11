@@ -30,6 +30,7 @@ library
                  , Raaz.Curves.EC25519.Internal
                  , Raaz.Curves.ED25519
                  , Raaz.Curves.ED25519.Internal
+                 , Raaz.Curves.ED25519.CPortable
   other-modules: Raaz.Curves.EC25519.CPortable
   build-depends: base                           >= 4.5 && < 4.8
                , bytestring                     >= 0.9 && < 0.11
@@ -51,7 +52,10 @@ library
       ghc-options: -Wall
   c-sources: cbits/raaz/curves/cportable/curve25519-donna.c
            , cbits/raaz/curves/cportable/curve25519-donna-c64.c
+           , cbits/raaz/curves/cportable/ed25519/ed25519.c
   include-dirs: cbits
+              , cbits/raaz/curves/cportable/ed25519
+              , cbits/raaz/curves/cportable/ed25519/include
 
   if os(linux)
      cc-options: -Wall -Werror -DRAAZ_HAVE_GCC
