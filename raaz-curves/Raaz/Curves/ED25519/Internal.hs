@@ -19,7 +19,6 @@ module Raaz.Curves.ED25519.Internal
       , PublicKey(..)
       , Point(..)
       , recoverPosX
-      , reverseWord
       , reverseWord256
       , reverseWord512
       , getRandomForSecret
@@ -30,19 +29,25 @@ module Raaz.Curves.ED25519.Internal
       , getA
       , basepointB
       , getSignature
-      , getHashBS
-      , getBSfromWord
+      , getHash
+      , wordToByteString
       , ed25519l
       , decodePoint
       , isOnCurve
       , getSignature'
       , verify
+      , W256(..)
+      , word256ToW256
+      , w256ToWord256
+      , word512ToW512
+      , w512ToWord512
+      , Signature(..)
+      , EDP25519(..)
        ) where
 
--- import Control.Applicative ( (<$>), (<*>) )
+import Control.Applicative ( (<$>), (<*>) )
 import Data.Bits
 -- import Data.Monoid
--- import Data.Typeable
 import Data.Word
 -- import Foreign.Ptr         ( castPtr      )
 -- import Foreign.Storable    ( peek, Storable(..) )
@@ -58,63 +63,37 @@ import Raaz.System.Random
 import Raaz.Core.Primitives.Hash
 import Raaz.Hash
 import Raaz.Core.Util.ByteString
-import qualified Data.ByteString       as B
--- import qualified Data.Vector.Generic   as G
--- import qualified Data.Vector.Unboxed   as VU
+import qualified Data.ByteString                      as B
+
+import qualified Data.Vector.Unboxed                  as VU
+import           Data.Typeable       ( Typeable     )
+import           Foreign.Ptr         ( castPtr      )
+
+import           Raaz.Core.Classes
+import           Raaz.Core.Parse.Applicative
+import           Raaz.Core.Primitives
+import           Raaz.Core.Write
+
 
 -- | The prime number (2^255 - 19)
 q :: Integer
 q = 57896044618658097711785492504343953926634992332820282019728792003956564819949
 {-# INLINE q #-}
 
--- | The number (q - 1)/4
+-- The number (q - 1)/4
 ed25519c :: Integer
 ed25519c = 14474011154664524427946373126085988481658748083205070504932198000989141204987
 {-# INLINE ed25519c #-}
 
--- |  l = 2^252 + 27742317777372353535851937790883648493
+-- l = 2^252 + 27742317777372353535851937790883648493
 ed25519l :: Integer
 ed25519l = 7237005577332262213973186563042994240857116359379907606001950938285454250989
 {-# INLINE ed25519l #-}
 
-modexpo :: EDP25519 -> Integer -> Integer -> EDP25519
-modexpo (EDP25519 g) k m = EDP25519 $ powModuloSlowSafe g k m
-
-inv :: EDP25519 -> EDP25519
-inv x = modexpo x (q - 2) q
-
-d :: EDP25519
-d = -121665 * (inv 121666)
-
-i :: EDP25519
-i = modexpo 2 ed25519c q
-
-recoverPosX :: EDP25519 -> EDP25519
-recoverPosX y = getX x xx
-  where xx = (y*y - 1) * (inv $ d*y*y + 1)
-        x  = modexpo xx ((q+3) `shiftR` 3) q
-        getX a b
-          | root .&. 1 /= 0 = 0 - a
-          | otherwise       = root
-          where root
-                  | (a*a - b) /= 0 = (a * i)
-                  | otherwise      = a
-
-baseY :: EDP25519
-baseY = 4 * (inv 5)
-
-baseX :: EDP25519
-baseX = recoverPosX baseY
-
--- | The basepoint B.
-basepointB :: Point
-basepointB = Point baseX baseY
-
-
 -- | Data type for numbers in the field - Modulo Prime q (2^255 - 19)
 newtype EDP25519 = EDP25519 { edInt :: Integer } deriving (Show, Eq, Ord, Real, Modular)
 
--- | Reduced Integer to mod prime 'q'
+-- | Reduce Integer to mod prime 'q'
 narrowP25519 :: Integer -> Integer
 narrowP25519 w = w `mod` q
 {-# INLINE narrowP25519 #-}
@@ -157,38 +136,48 @@ instance Bits EDP25519 where
   testBit                           = testBitDefault
 #endif
 
-
 -- | A Point in the prime field space.
 data Point = Point { pointX :: EDP25519, pointY :: EDP25519 } deriving (Eq, Show)
 
--- | A 'SecretKey' - where the last bit of the 256 bits is '1' if x is negative else '0'
--- and the rest of the bits represent y in the prime field space.
-newtype SecretKey = SecretKey { unSecretKey :: (LE Word256) } deriving (Eq, Show)
+-- timing-safe modular exponentiation
+modexpo :: EDP25519 -> Integer -> Integer -> EDP25519
+modexpo (EDP25519 g) k m = EDP25519 $ powModuloSlowSafe g k m
 
--- | A 'PublicKey' - where the last bit of the 256 bits is '1' if x is negative else '0'
--- and the rest of the bits represent y in the prime field space.
-newtype PublicKey = PublicKey { unPublicKey :: (LE Word256) } deriving (Eq, Show)
+-- modular inverse
+inv :: EDP25519 -> EDP25519
+inv x = modexpo x (q - 2) q
 
--- | Generate secret (P25519) from a random P25519 number as specified in
--- DJB's paper
-getSecretFromRandom :: (LE Word256) -> (LE Word256)
-getSecretFromRandom random = secret
-  where
-    temp1 = (((1 `shiftL` 248) - 1) `shiftL` 8) + 248
-    -- temp1: (256 bit number with 248 1's followed by 248)
-    temp2 = random .&. temp1
-    -- (Rightmost-byte `AND` with 248)
-    temp3 = (63 `shiftL` 248) .|. ((1 `shiftL` 248) - 1)
-    -- temp3: (256 bit number with 63 followed by 248 1's)
-    temp4 = temp2 .&. temp3
-    -- (Leftmost-byte `AND` with 63)
-    temp5 = 64 `shiftL` 248
-    -- temp5: (256 bit number with 64 followed by 248 1's)
-    secret = temp4 .|. temp5
-    -- (Leftmost-byte `OR` with 64)
+-- the non-square parameter 'd'
+d :: EDP25519
+d = -121665 * (inv 121666)
+
+i :: EDP25519
+i = modexpo 2 ed25519c q
+
+-- recover the positive 'x' coordinate corresponding to 'y'
+recoverPosX :: EDP25519 -> EDP25519
+recoverPosX y = getX x xx
+  where xx = (y*y - 1) * (inv $ d*y*y + 1)
+        x  = modexpo xx ((q+3) `shiftR` 3) q
+        getX a b
+          | root .&. 1 /= 0 = 0 - a
+          | otherwise       = root
+          where root
+                  | (a*a - b) /= 0 = (a * i)
+                  | otherwise      = a
+
+baseX :: EDP25519
+baseX = recoverPosX baseY
+
+baseY :: EDP25519
+baseY = 4 * (inv 5)
+
+-- | The basepoint 'B'
+basepointB :: Point
+basepointB = Point baseX baseY
 
 -- | Generates a random 32-byte number
-getRandomForSecret :: IO (LE Word256)
+getRandomForSecret :: IO W256
 getRandomForSecret = do
   stdPRG <- ((newPRG undefined) :: (IO SystemPRG))
   fromPRG stdPRG
@@ -215,17 +204,25 @@ pointMult k basepoint = montgom nbits (Point 0 1) basepoint
                    in montgom (bitnum-1) r0r0 r0r1
      where r0r1 = pointAdd r0 r1
 
-encodePoint :: Point -> (LE Word256)
+isOnCurve :: Point -> Bool
+isOnCurve (Point x y) = (-x*x + y*y - 1 - d*x*x*y*y) == 0
+
+encodePoint :: Point -> Word256
 encodePoint (Point x y) = pEncoding
-  where yEncoding = reverseWord $ fromInteger (edInt y)
+  where yEncoding = reverseWord256 $ fromInteger (edInt y)
         pEncoding = yEncoding .|. ((fromInteger $ edInt (x .&. 1)) `shiftL` 7)
 
--- changing endianness
-reverseWord :: (Bits w, Num w) => w -> w
-reverseWord n = go (n,0)
-  where go (0,b) = b
-        go (a,b) = let (a',b') = (a `shiftR` 8,a .&. 255)
-                    in go (a',((b `shiftL` 8) + b'))
+decodePoint :: Word256 -> Point
+decodePoint w = p
+  where revW = fromIntegral $ reverseWord256 w
+        y = EDP25519 $ revW .&. ((1 `shiftL` 255)-1)
+        x' = recoverPosX y
+        x = if (x' .&. 1) /= (((EDP25519 revW) `shiftR` 255) .&. 1)
+            then 0 - x'
+            else x'
+        p = if isOnCurve(Point x y)
+            then Point x y
+            else undefined
 
 -- changing endianness
 reverseWord256 :: (Bits w, Num w) => w -> w
@@ -241,13 +238,7 @@ reverseWord512 n = go (n, 64 :: Integer, 0)
         go (a, count, b) = let (a',b') = (a `shiftR` 8, a .&. 255)
                     in go (a', count-1, ((b `shiftL` 8) + b'))
 
--- byteSwap64 :: (LE Word64) -> (LE Word64)
--- byteSwap64 w =
---         (w `shift` (-56))                  .|. (w `shift` 56)
---     .|. ((w `shift` (-40)) .&. 0xff00)     .|. ((w .&. 0xff00) `shift` 40)
---     .|. ((w `shift` (-24)) .&. 0xff0000)   .|. ((w .&. 0xff0000) `shift` 24)
---     .|. ((w `shift` (-8))  .&. 0xff000000) .|. ((w .&. 0xff000000) `shift` 8)
-
+-- break a Word into a list of Word8
 toWord8List :: (Bits w, Num w, Integral w) => w -> Int -> [Word8]
 toWord8List w n = go w [] n
   where go _ l 0     = reverse l
@@ -259,9 +250,7 @@ fromWord8List (x:xs) = go x 0 xs
   where go a res []     = (res `shiftL` 8) .|. (fromIntegral a)
         go a res (y:ys) = go y ((res `shiftL` 8) .|. (fromIntegral a)) ys
 
-getSHA512 :: B.ByteString -> SHA512
-getSHA512 m = hash m
-
+-- returns the parameter 'A' given a hash value (integer form) 'h'
 getA :: Integer -> Integer
 getA h = (1 `shiftL` 254) + (go h 3)
   where go h' 253 = (1 `shiftL` 253) * (getBit h' 253)
@@ -272,75 +261,144 @@ getBit a index
   | testBit a index = 1
   | otherwise       = 0
 
-getSecretKey :: (LE Word256) -> SecretKey
-getSecretKey random = SecretKey $ getSecretFromRandom random
+wordToByteString :: (Num w, Integral w, Bits w, Storable w) => w -> B.ByteString
+wordToByteString w = B.pack $ toWord8List w (sizeOf w)
 
-getBSfromWord :: (Num w, Integral w, Bits w, Storable w) => w -> B.ByteString
-getBSfromWord w = B.pack $ toWord8List w (sizeOf w)
+getHash :: B.ByteString -> Word512
+getHash bs = fromWord8List . B.unpack . B.reverse . toByteString $ (hash bs :: SHA512)
 
-getHashBS :: B.ByteString -> (BE Word512)
-getHashBS bs = fromWord8List . B.unpack . B.reverse . toByteString $ getSHA512 bs
 
+-- | The 256-bit number for keys.
+newtype W256 = W256 (VU.Vector (LE Word64)) deriving ( Show, Typeable )
+
+-- | Timing independent equality testing.
+instance Eq W256 where
+ (==) (W256 g) (W256 h) = oftenCorrectEqVector g h
+
+instance Storable W256 where
+  sizeOf    _ = 4 * sizeOf (undefined :: (LE Word64))
+  alignment _ = alignment  (undefined :: (LE Word64))
+  peek  = unsafeRunParser w256parse . castPtr
+    where w256parse = W256 <$> unsafeParseStorableVector 4
+
+  poke ptr (W256 v) = unsafeWrite writeW256 cptr
+    where writeW256 = writeStorableVector v
+          cptr = castPtr ptr
+
+instance EndianStore W256 where
+  load = unsafeRunParser $ W256 <$> unsafeParseVector 4
+
+  store cptr (W256 v) = unsafeWrite writeW256 cptr
+    where writeW256 = writeVector v
+
+-- | The 512-bit number for signature.
+newtype W512 = W512 (VU.Vector (LE Word64)) deriving ( Show, Typeable )
+
+-- | Timing independent equality testing.
+instance Eq W512 where
+ (==) (W512 g) (W512 h) = oftenCorrectEqVector g h
+
+instance Storable W512 where
+  sizeOf    _ = 8 * sizeOf (undefined :: (LE Word64))
+  alignment _ = alignment  (undefined :: (LE Word64))
+  peek  = unsafeRunParser w512parse . castPtr
+    where w512parse = W512 <$> unsafeParseStorableVector 8
+
+  poke ptr (W512 v) = unsafeWrite writeW512 cptr
+    where writeW512 = writeStorableVector v
+          cptr = castPtr ptr
+
+instance EndianStore W512 where
+  load = unsafeRunParser $ W512 <$> unsafeParseVector 8
+
+  store cptr (W512 v) = unsafeWrite writeW512 cptr
+    where writeW512 = writeVector v
+
+w256ToWord256 :: W256 -> Word256
+w256ToWord256 (W256 vec) = VU.foldl func (0 :: Word256) (VU.reverse vec)
+  where func a b = (a `shiftL` 64) + (fromIntegral b)
+
+word256ToW256 :: Word256 -> W256
+word256ToW256 word256 = W256 $ go 4 word256 VU.empty
+  where go 0 _ v = v
+        go n w v = go (n-1) (w `shiftR` 64) (VU.snoc v (fromIntegral $ w .&. 18446744073709551615))
+
+w512ToWord512 :: W512 -> Word512
+w512ToWord512 (W512 vec) = VU.foldl func (0 :: Word512) (VU.reverse vec)
+  where func a b = (a `shiftL` 64) + (fromIntegral b)
+
+word512ToW512 :: Word512 -> W512
+word512ToW512 word512 = W512 $ go 8 word512 VU.empty
+  where go 0 _ v = v
+        go n w v = go (n-1) (w `shiftR` 64) (VU.snoc v (fromIntegral $ w .&. 18446744073709551615))
+
+-- | A 'SecretKey' - where the most significant bit of the last octet is
+-- '1' if x is negative else '0' and the rest of the bits represent y in
+-- the prime field space.
+newtype SecretKey = SecretKey W256 deriving (Show)
+
+-- | A 'PublicKey' - where the most significant bit of the last octet is
+-- '1' if x is negative else '0' and the rest of the bits represent y in
+-- the prime field space.
+newtype PublicKey = PublicKey W256 deriving (Show)
+
+-- | A 'Signature' - (does not include the message)
+newtype Signature = Signature W512 deriving (Show)
+
+-- | Returns the secret key given a random 256-bit number
+getSecretKey :: W256 -> SecretKey
+getSecretKey random = SecretKey random
+
+-- | Returns the public key given a secret key
 getPublicKey :: SecretKey -> PublicKey
-getPublicKey (SecretKey skw) = PublicKey encA
-  where skByteString = B.pack $ (toWord8List skw 32)
-        h = fromIntegral $ getHashBS skByteString
+getPublicKey (SecretKey skw') = PublicKey $ word256ToW256 encA
+  where skw = w256ToWord256 skw'
+        skByteString = B.pack $ (toWord8List skw 32)
+        h = fromIntegral $ getHash skByteString
         a = getA h
         a' = pointMult a basepointB
         encA = encodePoint a'
 
-newtype Signature = Signature (LE Word512) deriving (Eq, Show)
+-- | Returns the signature given a message as hexadecimal bytestring
+getSignature :: SecretKey -> B.ByteString -> Signature
+getSignature sk msg = getSignature' sk (getPublicKey sk) msg
 
-getSignature :: B.ByteString -> SecretKey -> PublicKey -> Signature
-getSignature msg (SecretKey skw) (PublicKey pkw) = Signature sign
-  where skByteString = B.pack $ (toWord8List skw 32)
-        h = fromIntegral $ getHashBS skByteString
+getSignature' :: SecretKey -> PublicKey -> B.ByteString -> Signature
+getSignature' (SecretKey skw') (PublicKey pkw') msg = Signature $ word512ToW512 sign
+  where skw = w256ToWord256 skw'
+        pkw = w256ToWord256 pkw'
+        skByteString = B.pack $ (toWord8List skw 32)
+        h = fromIntegral $ getHash skByteString
         a = getA h
-        upperh = (fromIntegral ((reverseWord512 h) .&. ((1 `shiftL` 256)-1))) :: Word256
-        rBS = B.append (getBSfromWord upperh) (unsafeFromHex msg)
-        r = fromIntegral $ getHashBS rBS
+        m = unsafeFromHex msg
+        upperh = (fromIntegral $ (reverseWord512 h) .&. ((1 `shiftL` 256)-1)) :: Word256
+        rBS = B.append (wordToByteString upperh) m
+        r = fromIntegral $ getHash rBS
         r' = pointMult r basepointB
         encR = encodePoint r'
-        temp1 = getBSfromWord encR
-        temp2 = getBSfromWord pkw
-        temp = B.append temp1 (B.append temp2 (unsafeFromHex msg))
-        s' = (r + ((fromIntegral (getHashBS temp)) * a)) `mod` ed25519l
-        encS =  reverseWord256 $ (fromInteger s') :: (LE Word256)
-        encR' = (fromIntegral encR) :: (LE Word512)
-        encS' = (fromIntegral encS) :: (LE Word512)
+        temp1 = wordToByteString encR
+        temp2 = wordToByteString pkw
+        temp = B.append temp1 (B.append temp2 m)
+        s' = (r + ((fromIntegral (getHash temp)) * a)) `mod` ed25519l
+        encS =  reverseWord256 $ (fromInteger s') :: Word256
+        encR' = (fromIntegral encR) :: Word512
+        encS' = (fromIntegral encS) :: Word512
         sign = (encR' `shiftL` 256) + encS'
 
-getSignature' :: B.ByteString -> SecretKey -> Signature
-getSignature' msg sk = getSignature msg sk pk
-  where pk = getPublicKey sk
-
-isOnCurve :: Point -> Bool
-isOnCurve (Point x y) = (-x*x + y*y - 1 -d*x*x*y*y) == 0
-
-decodePoint :: (LE Word256) -> Point
-decodePoint w = p
-  where revW = fromIntegral $ reverseWord256 w
-        y = fromIntegral $ revW .&. ((1 `shiftL` 255)-1)
-        x' = recoverPosX y
-        x = if (x' .&. 1) /= ((revW `shiftR` 255) .&. 1)
-            then 0 - x'
-            else x'
-        p = if isOnCurve(Point x y)
-            then Point x y
-            else undefined
-
 verify :: PublicKey -> B.ByteString -> Signature -> Bool
-verify (PublicKey pkw) msg (Signature sw)
+verify (PublicKey pkw') msg (Signature sw')
   | (sizeOf sw /= 64) || (sizeOf pkw /= 32) = False
   | otherwise = result
-    where encR = fromIntegral (sw `shiftR` 256)
+    where sw = w512ToWord512 sw'
+          pkw = w256ToWord256 pkw'
+          encR = fromIntegral (sw `shiftR` 256)
           rPoint = decodePoint encR
           aPoint = decodePoint pkw
           s = fromIntegral ((reverseWord512 sw) `shiftR` 256)
-          temp1 = getBSfromWord encR
-          temp2 = getBSfromWord pkw
+          temp1 = wordToByteString encR
+          temp2 = wordToByteString pkw
           temp3 = B.append (B.append temp1 temp2) (unsafeFromHex msg)
-          h = fromIntegral $ getHashBS temp3
+          h = fromIntegral $ getHash temp3
           result = if (pointMult s basepointB) /= (pointAdd rPoint (pointMult h aPoint))
                    then False
                    else True
