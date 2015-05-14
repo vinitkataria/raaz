@@ -19,8 +19,7 @@ module Raaz.Curves.ED25519.Internal
       , PublicKey(..)
       , Point(..)
       , recoverPosX
-      , reverseWord256
-      , reverseWord512
+      , reverseWord
       , getRandomForSecret
       , toWord8List
       , fromWord8List
@@ -45,7 +44,7 @@ module Raaz.Curves.ED25519.Internal
       , EDP25519(..)
        ) where
 
-import Control.Applicative ( (<$>), (<*>) )
+import Control.Applicative ( (<$>) )
 import Data.Bits
 -- import Data.Monoid
 import Data.Word
@@ -69,9 +68,9 @@ import qualified Data.Vector.Unboxed                  as VU
 import           Data.Typeable       ( Typeable     )
 import           Foreign.Ptr         ( castPtr      )
 
-import           Raaz.Core.Classes
+-- import           Raaz.Core.Classes
 import           Raaz.Core.Parse.Applicative
-import           Raaz.Core.Primitives
+-- import           Raaz.Core.Primitives
 import           Raaz.Core.Write
 
 
@@ -209,12 +208,12 @@ isOnCurve (Point x y) = (-x*x + y*y - 1 - d*x*x*y*y) == 0
 
 encodePoint :: Point -> Word256
 encodePoint (Point x y) = pEncoding
-  where yEncoding = reverseWord256 $ fromInteger (edInt y)
+  where yEncoding = reverseWord $ fromInteger (edInt y)
         pEncoding = yEncoding .|. ((fromInteger $ edInt (x .&. 1)) `shiftL` 7)
 
 decodePoint :: Word256 -> Point
 decodePoint w = p
-  where revW = fromIntegral $ reverseWord256 w
+  where revW = fromIntegral $ reverseWord w
         y = EDP25519 $ revW .&. ((1 `shiftL` 255)-1)
         x' = recoverPosX y
         x = if (x' .&. 1) /= (((EDP25519 revW) `shiftR` 255) .&. 1)
@@ -225,26 +224,19 @@ decodePoint w = p
             else undefined
 
 -- changing endianness
-reverseWord256 :: (Bits w, Num w) => w -> w
-reverseWord256 n = go (n, 32 :: Integer, 0)
-  where go (_, 0, b) = b
-        go (a, count, b) = let (a',b') = (a `shiftR` 8, a .&. 255)
-                    in go (a', count-1, ((b `shiftL` 8) + b'))
-
--- changing endianness
-reverseWord512 :: (Bits w, Num w) => w -> w
-reverseWord512 n = go (n, 64 :: Integer, 0)
+reverseWord :: (Bits w, Num w, Storable w) => w -> w
+reverseWord n = go (n, sizeOf n, 0)
   where go (_, 0, b) = b
         go (a, count, b) = let (a',b') = (a `shiftR` 8, a .&. 255)
                     in go (a', count-1, ((b `shiftL` 8) + b'))
 
 -- break a Word into a list of Word8
-toWord8List :: (Bits w, Num w, Integral w) => w -> Int -> [Word8]
-toWord8List w n = go w [] n
-  where go _ l 0     = reverse l
-        go w' l count = go (w' `shiftR` 8) (l ++ [fromIntegral (w' .&. 255)]) (count-1)
+toWord8List :: (Bits w, Num w, Integral w, Storable w) => w -> [Word8]
+toWord8List w = go w [] (sizeOf w)
+  where go _ l 0      = l
+        go w' l count = go (w' `shiftR` 8) (fromIntegral (w' .&. 255) : l) (count-1)
 
-fromWord8List :: (Bits w, Num w, Integral w) => [Word8] -> w
+fromWord8List :: (Bits w, Num w, Integral w, Storable w) => [Word8] -> w
 fromWord8List [] = 0
 fromWord8List (x:xs) = go x 0 xs
   where go a res []     = (res `shiftL` 8) .|. (fromIntegral a)
@@ -262,22 +254,21 @@ getBit a index
   | otherwise       = 0
 
 wordToByteString :: (Num w, Integral w, Bits w, Storable w) => w -> B.ByteString
-wordToByteString w = B.pack $ toWord8List w (sizeOf w)
+wordToByteString w = B.pack $ toWord8List w
 
-getHash :: B.ByteString -> Word512
+getHash :: B.ByteString -> (BE Word512)
 getHash bs = fromWord8List . B.unpack . B.reverse . toByteString $ (hash bs :: SHA512)
 
-
 -- | The 256-bit number for keys.
-newtype W256 = W256 (VU.Vector (LE Word64)) deriving ( Show, Typeable )
+newtype W256 = W256 (VU.Vector (BE Word64)) deriving ( Show, Typeable )
 
 -- | Timing independent equality testing.
 instance Eq W256 where
  (==) (W256 g) (W256 h) = oftenCorrectEqVector g h
 
 instance Storable W256 where
-  sizeOf    _ = 4 * sizeOf (undefined :: (LE Word64))
-  alignment _ = alignment  (undefined :: (LE Word64))
+  sizeOf    _ = 4 * sizeOf (undefined :: (BE Word64))
+  alignment _ = alignment  (undefined :: (BE Word64))
   peek  = unsafeRunParser w256parse . castPtr
     where w256parse = W256 <$> unsafeParseStorableVector 4
 
@@ -292,15 +283,15 @@ instance EndianStore W256 where
     where writeW256 = writeVector v
 
 -- | The 512-bit number for signature.
-newtype W512 = W512 (VU.Vector (LE Word64)) deriving ( Show, Typeable )
+newtype W512 = W512 (VU.Vector (BE Word64)) deriving ( Show, Typeable )
 
 -- | Timing independent equality testing.
 instance Eq W512 where
  (==) (W512 g) (W512 h) = oftenCorrectEqVector g h
 
 instance Storable W512 where
-  sizeOf    _ = 8 * sizeOf (undefined :: (LE Word64))
-  alignment _ = alignment  (undefined :: (LE Word64))
+  sizeOf    _ = 8 * sizeOf (undefined :: (BE Word64))
+  alignment _ = alignment  (undefined :: (BE Word64))
   peek  = unsafeRunParser w512parse . castPtr
     where w512parse = W512 <$> unsafeParseStorableVector 8
 
@@ -315,11 +306,11 @@ instance EndianStore W512 where
     where writeW512 = writeVector v
 
 w256ToWord256 :: W256 -> Word256
-w256ToWord256 (W256 vec) = VU.foldl func (0 :: Word256) (VU.reverse vec)
+w256ToWord256 (W256 vec) = VU.foldl func (0 :: Word256) vec
   where func a b = (a `shiftL` 64) + (fromIntegral b)
 
 word256ToW256 :: Word256 -> W256
-word256ToW256 word256 = W256 $ go 4 word256 VU.empty
+word256ToW256 word256 = W256 $ VU.reverse (go (4 :: Int) word256 VU.empty)
   where go 0 _ v = v
         go n w v = go (n-1) (w `shiftR` 64) (VU.snoc v (fromIntegral $ w .&. 18446744073709551615))
 
@@ -328,7 +319,7 @@ w512ToWord512 (W512 vec) = VU.foldl func (0 :: Word512) (VU.reverse vec)
   where func a b = (a `shiftL` 64) + (fromIntegral b)
 
 word512ToW512 :: Word512 -> W512
-word512ToW512 word512 = W512 $ go 8 word512 VU.empty
+word512ToW512 word512 = W512 $ go (8 :: Int) word512 VU.empty
   where go 0 _ v = v
         go n w v = go (n-1) (w `shiftR` 64) (VU.snoc v (fromIntegral $ w .&. 18446744073709551615))
 
@@ -353,7 +344,7 @@ getSecretKey random = SecretKey random
 getPublicKey :: SecretKey -> PublicKey
 getPublicKey (SecretKey skw') = PublicKey $ word256ToW256 encA
   where skw = w256ToWord256 skw'
-        skByteString = B.pack $ (toWord8List skw 32)
+        skByteString = B.pack $ toWord8List skw
         h = fromIntegral $ getHash skByteString
         a = getA h
         a' = pointMult a basepointB
@@ -367,11 +358,12 @@ getSignature' :: SecretKey -> PublicKey -> B.ByteString -> Signature
 getSignature' (SecretKey skw') (PublicKey pkw') msg = Signature $ word512ToW512 sign
   where skw = w256ToWord256 skw'
         pkw = w256ToWord256 pkw'
-        skByteString = B.pack $ (toWord8List skw 32)
-        h = fromIntegral $ getHash skByteString
+        skByteString = B.pack $ toWord8List skw
+        hashval = getHash skByteString
+        h = fromIntegral hashval
         a = getA h
         m = unsafeFromHex msg
-        upperh = (fromIntegral $ (reverseWord512 h) .&. ((1 `shiftL` 256)-1)) :: Word256
+        upperh = (fromIntegral $ (reverseWord hashval) .&. ((1 `shiftL` 256)-1)) :: Word256
         rBS = B.append (wordToByteString upperh) m
         r = fromIntegral $ getHash rBS
         r' = pointMult r basepointB
@@ -380,7 +372,7 @@ getSignature' (SecretKey skw') (PublicKey pkw') msg = Signature $ word512ToW512 
         temp2 = wordToByteString pkw
         temp = B.append temp1 (B.append temp2 m)
         s' = (r + ((fromIntegral (getHash temp)) * a)) `mod` ed25519l
-        encS =  reverseWord256 $ (fromInteger s') :: Word256
+        encS =  reverseWord $ (fromInteger s') :: Word256
         encR' = (fromIntegral encR) :: Word512
         encS' = (fromIntegral encS) :: Word512
         sign = (encR' `shiftL` 256) + encS'
@@ -394,7 +386,7 @@ verify (PublicKey pkw') msg (Signature sw')
           encR = fromIntegral (sw `shiftR` 256)
           rPoint = decodePoint encR
           aPoint = decodePoint pkw
-          s = fromIntegral ((reverseWord512 sw) `shiftR` 256)
+          s = fromIntegral ((reverseWord sw) `shiftR` 256)
           temp1 = wordToByteString encR
           temp2 = wordToByteString pkw
           temp3 = B.append (B.append temp1 temp2) (unsafeFromHex msg)

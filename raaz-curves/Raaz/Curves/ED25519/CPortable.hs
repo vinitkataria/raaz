@@ -97,13 +97,10 @@ createKeypairGivenRandom w@(W256 random) = do
       szBytes   = byteSize (undefined :: W256)
       totalSize = szBytes * 2
   allocaBuffer totalSize $ \ ptr -> do
-    store (ptr `plusPtr` size) (word256ToW256 (reverseWord256 (w256ToWord256 w)))
-    vk <- load (ptr `plusPtr` size)
-    print (vk :: (LE Word64))
+    store (ptr `plusPtr` size) w
     void $ c_crypto_sign_keypair_given_random ptr (ptr `plusPtr` size)
     pubkey <- load ptr
     secret <- load (ptr `plusPtr` size)
-    print (reverseWord256 (w256ToWord256 pubkey))
     return (SecretKey secret, PublicKey pubkey)
 
 
