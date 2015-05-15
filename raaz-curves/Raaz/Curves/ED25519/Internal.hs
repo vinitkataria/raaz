@@ -315,11 +315,11 @@ word256ToW256 word256 = W256 $ VU.reverse (go (4 :: Int) word256 VU.empty)
         go n w v = go (n-1) (w `shiftR` 64) (VU.snoc v (fromIntegral $ w .&. 18446744073709551615))
 
 w512ToWord512 :: W512 -> Word512
-w512ToWord512 (W512 vec) = VU.foldl func (0 :: Word512) (VU.reverse vec)
+w512ToWord512 (W512 vec) = VU.foldl func (0 :: Word512) vec
   where func a b = (a `shiftL` 64) + (fromIntegral b)
 
 word512ToW512 :: Word512 -> W512
-word512ToW512 word512 = W512 $ go (8 :: Int) word512 VU.empty
+word512ToW512 word512 = W512 $ VU.reverse (go (8 :: Int) word512 VU.empty)
   where go 0 _ v = v
         go n w v = go (n-1) (w `shiftR` 64) (VU.snoc v (fromIntegral $ w .&. 18446744073709551615))
 
