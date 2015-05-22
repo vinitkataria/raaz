@@ -53,6 +53,11 @@ library
       ghc-options: -Wall -fregs-graph
   else
       ghc-options: -Wall
+
+  if impl(ghc >= 7.6)
+     cpp-options: -DUseKinds
+     extensions: DataKinds
+
   c-sources: cbits/raaz/curves/cportable/curve25519-donna.c
            , cbits/raaz/curves/cportable/curve25519-donna-c64.c
            , cbits/raaz/curves/cportable/ed25519/ed25519.c

@@ -36,6 +36,7 @@ module Raaz.Curves.ED25519.Internal
       , getSignature'
       , verify
       , W256(..)
+      , W512(..)
       , word256ToW256
       , w256ToWord256
       , word512ToW512
