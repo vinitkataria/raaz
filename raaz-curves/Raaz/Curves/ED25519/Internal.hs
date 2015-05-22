@@ -73,6 +73,8 @@ import           Foreign.Ptr         ( castPtr      )
 import           Raaz.Core.Parse.Applicative
 -- import           Raaz.Core.Primitives
 import           Raaz.Core.Write
+import qualified Raaz.Core.Parse.Unsafe as PU
+import qualified Raaz.Core.Write.Unsafe as WU
 
 
 -- | The prime number (2^255 - 19)
@@ -336,6 +338,35 @@ newtype PublicKey = PublicKey W256 deriving (Show)
 
 -- | A 'Signature' - (does not include the message)
 newtype Signature = Signature W512 deriving (Show)
+
+instance Eq SecretKey where
+  (==) (SecretKey w1) (SecretKey w2) = (w1  ==  w2)
+
+instance Storable SecretKey where
+  sizeOf _     = sizeOf (undefined :: W256)
+  alignment _  = alignment (undefined :: W256)
+  peek ptr     = PU.runParser (castPtr ptr) $ SecretKey <$> PU.parseStorable
+  poke ptr k   = WU.runWrite (castPtr ptr) $ WU.writeStorable k
+
+-- | Stores individual words in Big Endian.
+instance EndianStore SecretKey where
+  load cptr    = PU.runParser cptr $ SecretKey <$> PU.parse
+  store cptr k = WU.runWrite cptr  $ WU.write k
+
+instance Eq PublicKey where
+  (==) (PublicKey w1) (PublicKey w2) = (w1  ==  w2)
+
+instance Storable PublicKey where
+  sizeOf _     = sizeOf (undefined :: W256)
+  alignment _  = alignment (undefined :: W256)
+  peek ptr     = PU.runParser (castPtr ptr) $ PublicKey <$> PU.parseStorable
+  poke ptr k   = WU.runWrite (castPtr ptr) $ WU.writeStorable k
+
+-- | Stores individual words in Big Endian.
+instance EndianStore PublicKey where
+  load cptr    = PU.runParser cptr $ PublicKey <$> PU.parse
+  store cptr k = WU.runWrite cptr  $ WU.write k
+
 
 -- | Returns the secret key given a random 256-bit number
 getSecretKey :: W256 -> SecretKey

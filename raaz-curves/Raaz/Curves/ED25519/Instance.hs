@@ -46,7 +46,7 @@ instance Hash h => Primitive (Ed25519 h SignMode) where
 
   blockSize _ = blockSize (undefined :: h)
 
-  type Key (Ed25519 h SignMode) = W256
+  type Key (Ed25519 h SignMode) = SecretKey
 
 -- | Signature generation is a safe primitive if the underlying hash is safe.
 instance Hash h => SafePrimitive (Ed25519 h SignMode)
@@ -58,7 +58,7 @@ instance Hash h => CryptoPrimitive (Ed25519 h SignMode) where
 
 
 -- | Memory used in Ed25519 Signing gadget
-newtype Ed25519SignMem h m = Ed25519SignMem (CryptoCell W256, m)
+newtype Ed25519SignMem h m = Ed25519SignMem (CryptoCell SecretKey, m)
 
 deriving instance Memory m => Memory (Ed25519SignMem h m)
 
@@ -66,7 +66,7 @@ instance ( InitializableMemory m
          , Hash h
          , IV m ~ Key h
          ) => InitializableMemory (Ed25519SignMem h m) where
-  type IV (Ed25519SignMem h m) = W256
+  type IV (Ed25519SignMem h m) = SecretKey
 
   initializeMemory rmem@(Ed25519SignMem (kcell, hmem)) k = do
     cellPoke kcell k
@@ -98,7 +98,7 @@ instance ( FinalizableMemory m
       getH = undefined
 
 
-getMySign :: Hash h => h -> W256 -> W512
+getMySign :: Hash h => h -> SecretKey -> W512
 getMySign hval sk = word512ToW512 (0 :: Word512)
 
 -- | Padding for signature primitive is same as that of the underlying
@@ -147,7 +147,7 @@ instance Hash h => Primitive (Ed25519 h VerifyMode) where
 
   blockSize _ = blockSize (undefined :: h)
 
-  type Key (Ed25519 h VerifyMode) = (W256, Ed25519 h SignMode)
+  type Key (Ed25519 h VerifyMode) = (PublicKey, Ed25519 h SignMode)
 
 -- | Signature verification is a safe primitive if the underlying hash is safe.
 instance Hash h => SafePrimitive (Ed25519 h VerifyMode)
@@ -160,7 +160,7 @@ instance ( Hash h
 
 
 -- | Memory used in Ed25519 Verification gadget
-newtype Ed25519VerifyMem h m = Ed25519VerifyMem (CryptoCell (W256), CryptoCell W512, m)
+newtype Ed25519VerifyMem h m = Ed25519VerifyMem (CryptoCell (PublicKey), CryptoCell W512, m)
 
 deriving instance Memory m => Memory (Ed25519VerifyMem h m)
 
@@ -168,7 +168,7 @@ instance ( InitializableMemory m
          , Hash h
          , IV m ~ Key h
          ) => InitializableMemory (Ed25519VerifyMem h m) where
-  type IV (Ed25519VerifyMem h m) = (W256, Ed25519 h SignMode)
+  type IV (Ed25519VerifyMem h m) = (PublicKey, Ed25519 h SignMode)
 
   initializeMemory rmem@(Ed25519VerifyMem (kcell, sigcell, hmem)) (k, Ed25519 sig) = do
     cellPoke kcell k
@@ -199,7 +199,7 @@ instance ( FinalizableMemory m
       getH :: Ed25519VerifyMem h m -> h
       getH = undefined
 
-myVerify :: Hash h => h -> W256 -> W512 -> Bool
+myVerify :: Hash h => h -> PublicKey -> W512 -> Bool
 myVerify h pk w = True
 
 instance Hash h => HasPadding (Ed25519 h VerifyMode) where

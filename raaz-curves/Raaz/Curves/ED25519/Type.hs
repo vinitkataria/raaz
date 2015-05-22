@@ -7,8 +7,8 @@
 module Raaz.Curves.ED25519.Type
        ( Ed25519(..)
        , Ed25519Gadget(..)
-       , W256(..)
-       , W256(..)
+       , SecretKey(..)
+       , PublicKey(..)
        ) where
 
 import           Control.Applicative ( (<$>) )
@@ -74,11 +74,11 @@ type family Ed25519Mem (m :: Mode) :: *
 type family Ed25519Mem m :: *
 #endif
 
-type instance Ed25519Mem SignMode = CryptoCell (W256)
-type instance Ed25519Mem VerifyMode = (CryptoCell (W256), CryptoCell W512)
+type instance Ed25519Mem SignMode = CryptoCell (SecretKey)
+type instance Ed25519Mem VerifyMode = (CryptoCell (PublicKey), CryptoCell W512)
 
-type instance Ed25519Mem EncryptMode = CryptoCell (W256)
-type instance Ed25519Mem DecryptMode = CryptoCell (W256)
+type instance Ed25519Mem EncryptMode = CryptoCell (PublicKey)
+type instance Ed25519Mem DecryptMode = CryptoCell (SecretKey)
 
 keySize :: Storable w => k w -> BYTES Int
 keySize = BYTES . sizeOf . getW
