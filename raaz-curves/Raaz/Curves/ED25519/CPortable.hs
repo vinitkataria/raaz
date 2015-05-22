@@ -60,40 +60,6 @@ import Raaz.Core.Types
 import Raaz.Core.Util.Ptr
 import Control.Monad       ( foldM )
 
--- foreign import ccall unsafe
---   "raaz/hash/sha512/portable.h raazHashSha512PortableCompress"
---   c_sha512_compress  :: Ptr SHA512 -> Int -> CryptoPtr -> IO ()
-
--- sha512Compress :: CryptoCell SHA512 -> BLOCKS SHA512 -> CryptoPtr -> IO ()
--- sha512Compress cc nblocks buffer = withCell cc action
---   where action ptr = c_sha512_compress (castPtr ptr) n buffer
---         n = fromEnum nblocks
--- {-# INLINE sha512Compress #-}
-
--- instance Gadget (CGadget SHA512) where
---   type PrimitiveOf (CGadget SHA512) = SHA512
---   type MemoryOf (CGadget SHA512)    = CryptoCell SHA512
---   newGadgetWithMemory               = return . CGadget
---   getMemory (CGadget m)             = m
---   apply (CGadget cc)                = sha512Compress cc
-
-instance Gadget (CGadget Sign) where
-  type PrimitiveOf (CGadget Sign)  = Sign
-  type MemoryOf (CGadget Sign)     = CryptoCell Sign
-  newGadgetWithMemory                = return . CGadget
-  getMemory (CGadget m)              = m
-  apply (CGadget cc) n cptr          = do
-    initial <- cellPeek cc
-    final <- fst <$> foldM moveAndHash (initial,cptr) [1..n]
-    cellPoke cc final
-    where
-      sz = blockSize (undefined :: Sign)
-      moveAndHash (cxt,ptr) _ = do newCxt <- sha512CompressSingle cxt ptr
-                                   return (newCxt, ptr `movePtr` sz)
-
-instance PaddableGadget (CGadget Sign)
-
-
 foreign import ccall unsafe "ed25519_sign_keypair"
   c_crypto_sign_keypair :: CryptoPtr -> CryptoPtr -> IO CInt
 
