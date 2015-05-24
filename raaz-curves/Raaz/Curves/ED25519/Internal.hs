@@ -329,12 +329,12 @@ word512ToW512 word512 = W512 $ VU.reverse (go (8 :: Int) word512 VU.empty)
 -- | A 'SecretKey' - where the most significant bit of the last octet is
 -- '1' if x is negative else '0' and the rest of the bits represent y in
 -- the prime field space.
-newtype SecretKey = SecretKey W256 deriving (Show)
+newtype SecretKey = SecretKey { sKey :: W256 } deriving (Show)
 
 -- | A 'PublicKey' - where the most significant bit of the last octet is
 -- '1' if x is negative else '0' and the rest of the bits represent y in
 -- the prime field space.
-newtype PublicKey = PublicKey W256 deriving (Show)
+newtype PublicKey = PublicKey { pKey :: W256 } deriving (Show)
 
 -- | A 'Signature' - (does not include the message)
 newtype Signature = Signature W512 deriving (Show)
@@ -346,12 +346,12 @@ instance Storable SecretKey where
   sizeOf _     = sizeOf (undefined :: W256)
   alignment _  = alignment (undefined :: W256)
   peek ptr     = PU.runParser (castPtr ptr) $ SecretKey <$> PU.parseStorable
-  poke ptr k   = WU.runWrite (castPtr ptr) $ WU.writeStorable k
+  poke ptr k   = WU.runWrite (castPtr ptr) $ WU.writeStorable (sKey k)
 
 -- | Stores individual words in Big Endian.
 instance EndianStore SecretKey where
   load cptr    = PU.runParser cptr $ SecretKey <$> PU.parse
-  store cptr k = WU.runWrite cptr  $ WU.write k
+  store cptr k = WU.runWrite cptr  $ WU.write (sKey k)
 
 instance Eq PublicKey where
   (==) (PublicKey w1) (PublicKey w2) = (w1  ==  w2)
@@ -360,12 +360,12 @@ instance Storable PublicKey where
   sizeOf _     = sizeOf (undefined :: W256)
   alignment _  = alignment (undefined :: W256)
   peek ptr     = PU.runParser (castPtr ptr) $ PublicKey <$> PU.parseStorable
-  poke ptr k   = WU.runWrite (castPtr ptr) $ WU.writeStorable k
+  poke ptr k   = WU.runWrite (castPtr ptr) $ WU.writeStorable (pKey k)
 
 -- | Stores individual words in Big Endian.
 instance EndianStore PublicKey where
   load cptr    = PU.runParser cptr $ PublicKey <$> PU.parse
-  store cptr k = WU.runWrite cptr  $ WU.write k
+  store cptr k = WU.runWrite cptr  $ WU.write (pKey k)
 
 
 -- | Returns the secret key given a random 256-bit number

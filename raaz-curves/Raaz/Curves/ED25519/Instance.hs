@@ -12,7 +12,7 @@ This module defines the hash instances for sha512 hash.
 {-# LANGUAGE FlexibleInstances          #-}
 {-# OPTIONS_GHC -fno-warn-orphans       #-}
 
-module Raaz.Curves.ED25519.Instance () where
+module Raaz.Curves.ED25519.Instance ( myVerify, getMySign) where
 
 import Control.Applicative ( (<$>) )
 import Control.Monad       ( foldM )
@@ -37,6 +37,8 @@ import Raaz.Core.Primitives.Asymmetric
 import Raaz.Core.Primitives.Hash
 import Raaz.Public
 import Raaz.Number
+import Raaz.Hash.Sha512
+import Raaz.Core.Types
 
 -------------------------------- Auth -------------------------------------
 
@@ -88,7 +90,8 @@ instance ( FinalizableMemory m
   finalizeMemory m@(Ed25519SignMem (kcell, hmem)) = do
     k <- finalizeMemory kcell
     hcxt <- getDigest (getH m) <$> finalizeMemory hmem
-
+    print k
+    print (toByteString hcxt)
     return $ Ed25519 $ getMySign hcxt k                          -- remaining
 
     where

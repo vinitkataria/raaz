@@ -18,6 +18,7 @@ https://github.com/agl/curve25519-donna/.
 module Raaz.Curves.ED25519.CPortable
         ( createKeypair
         , createKeypairGivenRandom
+        , skTest
         ) where
 
 import Control.Monad   (void)
@@ -96,6 +97,18 @@ foreign import ccall unsafe "ed25519_sign_open"
 --     "curve25519-donna-c64.c raaz_curve25519_donna_c64"
 --      c_curve25519_donna :: CryptoPtr -> CryptoPtr -> CryptoPtr -> IO CInt
 -- #endif
+skTest :: IO ()
+skTest = do
+  let size      = sizeOf (undefined :: SecretKey)
+      szBytes   = byteSize (undefined :: SecretKey)
+      sk        = SecretKey (word256ToW256 0)
+      SecretKey w = sk
+  allocaBuffer szBytes $ \ ptr -> do
+    print w
+    store ptr sk
+    (SecretKey key) <- load ptr
+    print key
+    return ()
 
 createKeypair :: IO (SecretKey, PublicKey)
 createKeypair = do
