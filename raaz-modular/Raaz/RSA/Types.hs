@@ -170,11 +170,11 @@ type family RSAMem k (m :: Mode) :: *
 type family RSAMem k m :: *
 #endif
 
-type instance RSAMem k SignMode = CryptoCell (PrivateKey k)
-type instance RSAMem k VerifyMode = (CryptoCell (PublicKey k), CryptoCell k)
+type instance RSAMem k SignMode = MemoryCell (PrivateKey k)
+type instance RSAMem k VerifyMode = (MemoryCell (PublicKey k), MemoryCell k)
 
-type instance RSAMem k EncryptMode = CryptoCell (PublicKey k)
-type instance RSAMem k DecryptMode = CryptoCell (PrivateKey k)
+type instance RSAMem k EncryptMode = MemoryCell (PublicKey k)
+type instance RSAMem k DecryptMode = MemoryCell (PrivateKey k)
 
 keySize :: Storable w => k w -> BYTES Int
 keySize = BYTES . sizeOf . getW

@@ -43,13 +43,14 @@ instance Hash h => SafePrimitive (RSA k h PKCS SignMode)
 
 instance ( Hash h
          , Storable k
+         ,
          ) => CryptoPrimitive (RSA k h PKCS SignMode) where
   type Recommended (RSA k h PKCS SignMode) = RSAGadget k (Recommended h) PKCS SignMode
   type Reference (RSA k h PKCS SignMode) = RSAGadget k (Reference h) PKCS SignMode
 
 
 -- | Memory used in RSA Signing gadget
-newtype RSASignMem k h m = RSASignMem (CryptoCell (PrivateKey k), m)
+newtype RSASignMem k h m = RSASignMem (MemoryCell (PrivateKey k), m)
 
 deriving instance (Storable k, Memory m) => Memory (RSASignMem k h m)
 
@@ -62,7 +63,7 @@ instance ( Storable k
 
   initializeMemory rmem@(RSASignMem (kcell, hmem)) k = do
     cellPoke kcell k
-    initializeMemory hmem (defaultCxt (rHash rmem))
+    initializeMemory hmem (defaultKey (rHash rmem))
       where
         rHash :: RSASignMem k h m -> h
         rHash _ = undefined
@@ -114,11 +115,11 @@ instance ( Gadget g
 
   type PrimitiveOf (RSAGadget k g PKCS SignMode) = RSA k (PrimitiveOf g) PKCS SignMode
 
-  type MemoryOf (RSAGadget k g PKCS SignMode)    = RSASignMem k (PrimitiveOf g) (MemoryOf g)
+  -- type MemoryOf (RSAGadget k g PKCS SignMode)    = RSASignMem k (PrimitiveOf g) (MemoryOf g)
 
-  newGadgetWithMemory (RSASignMem (ck, gmem))    = RSAGadget ck <$> newGadgetWithMemory gmem
+  -- newGadgetWithMemory (RSASignMem (ck, gmem))    = RSAGadget ck <$> newGadgetWithMemory gmem
 
-  getMemory (RSAGadget ck g)                     = RSASignMem (ck, getMemory g)
+  -- getMemory (RSAGadget ck g)                     = RSASignMem (ck, getMemory g)
 
   apply (RSAGadget _ g) blks                     = apply g blks'
     where blks'                                  = toEnum $ fromEnum blks
@@ -155,7 +156,7 @@ instance ( Hash h
 
 
 -- | Memory used in RSA Verification gadget
-newtype RSAVerifyMem k h m = RSAVerifyMem (CryptoCell (PublicKey k), CryptoCell k, m)
+newtype RSAVerifyMem k h m = RSAVerifyMem (MemoryCell (PublicKey k), MemoryCell k, m)
 
 deriving instance (Storable k, Memory m) => Memory (RSAVerifyMem k h m)
 
@@ -169,7 +170,7 @@ instance ( Storable k
   initializeMemory rmem@(RSAVerifyMem (kcell, sigcell, hmem)) (k, RSA sig) = do
     cellPoke kcell k
     cellPoke sigcell sig
-    initializeMemory hmem (defaultCxt (rHash rmem))
+    initializeMemory hmem (defaultKey (rHash rmem))
       where
         rHash :: RSAVerifyMem k h m -> h
         rHash _ = undefined
@@ -220,11 +221,11 @@ instance ( Gadget g
 
   type PrimitiveOf (RSAGadget k g PKCS VerifyMode)     = RSA k (PrimitiveOf g) PKCS VerifyMode
 
-  type MemoryOf (RSAGadget k g PKCS VerifyMode)        = RSAVerifyMem k (PrimitiveOf g) (MemoryOf g)
+  -- type MemoryOf (RSAGadget k g PKCS VerifyMode)        = RSAVerifyMem k (PrimitiveOf g) (MemoryOf g)
 
-  newGadgetWithMemory (RSAVerifyMem (cpk, csig, gmem)) = RSAGadget (cpk,csig) <$> newGadgetWithMemory gmem
+  -- newGadgetWithMemory (RSAVerifyMem (cpk, csig, gmem)) = RSAGadget (cpk,csig) <$> newGadgetWithMemory gmem
 
-  getMemory (RSAGadget (ck,csig) g)                    = RSAVerifyMem (ck, csig, getMemory g)
+  -- getMemory (RSAGadget (ck,csig) g)                    = RSAVerifyMem (ck, csig, getMemory g)
 
   apply (RSAGadget _ g) blks                           = apply g blks'
     where blks'                                        = toEnum $ fromEnum blks
