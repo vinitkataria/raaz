@@ -31,9 +31,11 @@ import Raaz.Curves.ED25519.Type
 -- import Raaz.Curves.ED25519.CPortable ()
 import Raaz.Curves.ED25519.Internal
 
+import System.IO.Unsafe
 import Control.Applicative
 import Foreign.Storable
 
+import Raaz.Core.ByteSource
 import Raaz.Core.Memory
 import Raaz.Core.Primitives
 import Raaz.Core.Primitives.Asymmetric
@@ -58,16 +60,9 @@ instance Primitive h => Primitive (Ed25519Sign h) where
 -- | Signature generation is a safe primitive if the underlying hash is safe.
 instance SafePrimitive h => SafePrimitive (Ed25519Sign h)
 
-
 instance Hash h => CryptoPrimitive (Ed25519Sign h) where
   type Recommended (Ed25519Sign h) = EdSignGadget (Recommended h)
   type Reference (Ed25519Sign h) = EdSignGadget (Reference h)
-
-
--- | Memory used in Ed25519 Signing gadget
--- newtype Ed25519SignMem h m = Ed25519SignMem (CryptoCell SecretKey, m)
-
--- deriving instance Memory m => Memory (Ed25519SignMem h m)
 
 instance (Gadget g, Hash (PrimitiveOf g)) => Memory (EdSignGadget g) where
 
@@ -144,17 +139,21 @@ instance ( FV g ~ Key (PrimitiveOf g)
 --                        $ maxAdditionalBlocks (undefined :: h)
 
 instance HasPadding h => HasPadding (Ed25519Sign h) where
-  padLength hmc bits = padLength h bits'
-    where h     = gethash hmc
-          bits' = bits + inBits (blocksOf 1 hmc)
 
-  padding hmc bits = padding h bits'
-    where h     = gethash hmc
-          bits' = bits + inBits (blocksOf 1 hmc)
+  -- The extra size of 256 bits is to account for the
+  -- secretkey for the first hash.
 
-  unsafePad hmc bits = unsafePad h bits'
-    where h     = gethash hmc
-          bits' = bits + inBits (blocksOf 1 hmc)
+  padLength sgn bits = padLength h bits'
+    where h     = gethash sgn
+          bits' = bits + inBits (byteSize (undefined :: SecretKey))        -- 256 bits for the secretkey
+
+  padding sgn bits = padding h bits'
+    where h     = gethash sgn
+          bits' = bits + inBits (byteSize (undefined :: SecretKey))        -- 256 bits for the secretkey
+
+  unsafePad sgn bits = unsafePad h bits'
+    where h     = gethash sgn
+          bits' = bits + inBits (byteSize (undefined :: SecretKey))        -- 256 bits for the secretkey
 
   maxAdditionalBlocks  = toEnum . fromEnum
                        . maxAdditionalBlocks
@@ -183,8 +182,40 @@ instance ( PaddableGadget g
          , IV g ~ Key (PrimitiveOf g)
          , FV g ~ Key (PrimitiveOf g)
          ) => PaddableGadget (EdSignGadget g) where
-  unsafeApplyLast (EdSignGadget _ g _ _ _) blks = unsafeApplyLast g blks'
-    where blks' = toEnum $ fromEnum blks
+  -- unsafeApplyLast (EdSignGadget _ g _ _ _) blks = unsafeApplyLast g blks'
+  --   where blks' = toEnum $ fromEnum blks
+  -- unsafeApplyLast (EdSignGadget kcell g1 g2 g3 hbuf) blks bytes cptr = do
+  unsafeApplyLast (EdSignGadget kcell g1 g2 g3 hbuf) blks bytes cptr = do
+
+    withMemoryBuf hbuf $ \ _ cptr' -> do
+      (sk :: SecretKey) <- cellPeek kcell
+      store cptr' sk
+      memcpy (cptr' `movePtr` skSize) cptr numBytesFromMsg1
+      apply g1 1 cptr'
+
+    unsafeApplyLast g1 (blks' + 1) (bytes - numBytesFromMsg1) cptr
+
+    where numBytesFromMsg1 = (blockSize (primitiveOf g1)) - skSize
+          skSize = byteSize (undefined :: SecretKey)
+          blks' = toEnum $ fromEnum blks
+
+    -- return $ unsafeApplyLast g blks'
+   -- where blks' = toEnum $ fromEnum blks
+
+   --  -- finish of the inner hash one for inner pad already hashed
+   --  unsafeApplyLast g1 (blks' + 1) bytes cptr
+
+   --  -- Recover hash (inner pad ++ message)
+   --  innerHash <- getDigest ig
+
+   --  -- hash ( outerpad ++ inner hash)
+   --  withMemoryBuf buf $ \ _ cptr' -> do
+   --       store cptr' innerHash
+   --       unsafeApplyLast og 1 (byteSize innerHash) cptr'
+
+   -- where blks' = toEnum $ fromEnum blks
+   --       getDigest :: Gadget g => g -> IO (PrimitiveOf g)
+   --       getDigest g' = hashDigest <$> finalizeMemory g'
 
 -- | Generate Signature.
 -- edsign' :: ( Sign p
@@ -209,6 +240,26 @@ instance ( PaddableGadget g
 --           transformGadget gad src
 --           finalize gad
 
+-- | Generate Signature
+sign' :: ( PureByteSource src
+         , FinalizableMemory g
+         , FV g ~ prim
+         , PaddableGadget g
+         , prim ~ PrimitiveOf g
+         )
+      => g             -- ^ Type of Gadget
+      -> Key prim      -- ^ Key
+      -> src           -- ^ Message
+      -> prim
+sign' g key src = unsafePerformIO $ withGadget key $ go g
+  where go :: ( PaddableGadget g1
+              , FinalizableMemory g1
+              )
+           => g1 -> g1 -> IO (FV g1)
+        go _ gad =  do
+          transformGadget gad src
+          finalizeMemory gad
+
 -- -- | Generate signature using recommended gadget.
 -- edsign :: ( Sign p
 --         , g ~ Recommended prim
@@ -232,20 +283,19 @@ instance ( PaddableGadget g
 -- --------------------------------- Verify ----------------------------------
 
 -- -- | Primitive instance for Signature verification primitive.
--- instance Hash h => Primitive (Ed25519Verify h) where
+instance Primitive h => Primitive (Ed25519Verify h) where
 
---   blockSize _ = blockSize (undefined :: h)
+  blockSize                  = blockSize . gethash'
 
---   type Key (Ed25519Verify h) = (PublicKey, Ed25519Sign h)
+  type Key (Ed25519Verify h) = (PublicKey, W512)
 
 -- -- | Signature verification is a safe primitive if the underlying hash is safe.
--- instance Hash h => SafePrimitive (Ed25519Verify h)
+-- instance SafePrimitive h => SafePrimitive (Ed25519Verify h)
 
 
--- instance ( Hash h
---          ) => CryptoPrimitive (Ed25519Verify h) where
---   type Recommended (Ed25519Verify h) = Ed25519Gadget (Recommended h) VerifyMode
---   type Reference (Ed25519Verify h) = Ed25519Gadget (Reference h) VerifyMode
+-- instance Hash h => CryptoPrimitive (Ed25519Verify h) where
+--   type Recommended (Ed25519Verify h) = EdVerifyGadget (Recommended h)
+--   type Reference (Ed25519Verify h) = EdVerifyGadget (Reference h)
 
 
 -- -- | Memory used in Ed25519 Verification gadget
@@ -338,3 +388,9 @@ gethash = undefined
 
 gethashGadget :: EdSignGadget g -> g
 gethashGadget (EdSignGadget _ g _ _ _) = g
+
+gethash' :: Ed25519Verify h -> h
+gethash' = undefined
+
+gethashGadget' :: EdVerifyGadget g -> g
+gethashGadget' (EdVerifyGadget _ g) = g

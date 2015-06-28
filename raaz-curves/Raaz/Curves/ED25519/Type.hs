@@ -74,7 +74,7 @@ import Raaz.Curves.ED25519.Internal
 --                       -- buffer used to take repeated hashes
 
 data Ed25519Sign h = Ed25519Sign W512 deriving (Show, Eq)
-data Ed25519Verify = Ed25519Verify W512 deriving (Show, Eq)
+data Ed25519Verify h = Ed25519Verify W512 deriving (Show, Eq)
 
 data EdSignGadget g = EdSignGadget (MemoryCell (SecretKey))
                                    g -- first hash of secret key
