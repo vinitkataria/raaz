@@ -138,26 +138,26 @@ instance ( FV g ~ Key (PrimitiveOf g)
 --   maxAdditionalBlocks _ = toEnum . fromEnum
 --                        $ maxAdditionalBlocks (undefined :: h)
 
-instance HasPadding h => HasPadding (Ed25519Sign h) where
+-- instance HasPadding h => HasPadding (Ed25519Sign h) where
 
-  -- The extra size of 256 bits is to account for the
-  -- secretkey for the first hash.
+--   -- The extra size of 256 bits is to account for the
+--   -- secretkey for the first hash.
 
-  padLength sgn bits = padLength h bits'
-    where h     = gethash sgn
-          bits' = bits + inBits (byteSize (undefined :: SecretKey))        -- 256 bits for the secretkey
+--   padLength sgn bits = padLength h bits'
+--     where h     = gethash sgn
+--           bits' = bits + inBits (byteSize (undefined :: SecretKey))        -- 256 bits for the secretkey
 
-  padding sgn bits = padding h bits'
-    where h     = gethash sgn
-          bits' = bits + inBits (byteSize (undefined :: SecretKey))        -- 256 bits for the secretkey
+--   padding sgn bits = padding h bits'
+--     where h     = gethash sgn
+--           bits' = bits + inBits (byteSize (undefined :: SecretKey))        -- 256 bits for the secretkey
 
-  unsafePad sgn bits = unsafePad h bits'
-    where h     = gethash sgn
-          bits' = bits + inBits (byteSize (undefined :: SecretKey))        -- 256 bits for the secretkey
+--   unsafePad sgn bits = unsafePad h bits'
+--     where h     = gethash sgn
+--           bits' = bits + inBits (byteSize (undefined :: SecretKey))        -- 256 bits for the secretkey
 
-  maxAdditionalBlocks  = toEnum . fromEnum
-                       . maxAdditionalBlocks
-                       . gethash
+--   maxAdditionalBlocks  = toEnum . fromEnum
+--                        . maxAdditionalBlocks
+--                        . gethash
 
 -- | Gadget instance which is same as the underlying hashing gadget.
 instance ( Gadget g, prim ~ PrimitiveOf g
