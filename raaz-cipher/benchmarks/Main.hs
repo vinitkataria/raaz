@@ -26,7 +26,7 @@ benchmarksTiny = do
   aes <- AES.benchmarksTiny
   salsa <- S20.benchmarksTiny
   -- return [bgroup "AES" aes, bgroup "Salsa20" salsa]
-  return []
+  return [bgroup "Salsa20" salsa]
 
 benchmarks= do
   aes <- AES.benchmarks

@@ -34,11 +34,15 @@ benchmarksTiny = take 2 <$> benchmarks
 --   return $ benchGadgetWith g' iv (nBlocks g')
 
 action_s20_128 :: (KEY128, Nonce) -> HSalsa20Gadget R20 KEY128 -> IO Benchmark
-action_s20_128 tk g = return $ benchGadgetWith g tk (nBlocks g)
+action_s20_128 tk g = benchGadgetWith g tk (nBlocks g)
 
+benchmarker
 benchmarks = sequence
-            [ withMemory (action_s20_128 testKey128)
-            ]
+            [ benchmarker s20_128 testKey128 (nBlocks s20_128) ]
+  where
+    s20_128 :: HSalsa20Gadget R20 KEY128
+    s20_128 = undefined
+
 
 -- benchmarks = sequence
 --              [ benchCipher s20_128  testKey128
