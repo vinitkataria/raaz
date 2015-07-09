@@ -43,20 +43,21 @@ testKey256 =  ( fromByteString $ unsafeFromHex "603deb1015ca71be2b73aef0857d7781
 benchmarksTinyDefault p s128 s192 s256 = take 2 <$> benchmarksDefault p s128 s192 s256
 
 benchmarksDefault p s128 s192 s256 = sequence
-                      [ benchCipher (toH $ prim128 p) s128
-                      , benchCipher (toC $ prim128 p) s128
-                      , benchCipher (toH $ prim192 p) s192
-                      , benchCipher (toC $ prim192 p) s192
-                      , benchCipher (toH $ prim256 p) s256
-                      , benchCipher (toC $ prim256 p) s256
-                      , benchCipher (inverse $ toH $ prim128 p) s128
-                      , benchCipher (inverse $ toC $ prim128 p) s128
-                      , benchCipher (inverse $ toH $ prim192 p) s192
-                      , benchCipher (inverse $ toC $ prim192 p) s192
-                      , benchCipher (inverse $ toH $ prim256 p) s256
-                      , benchCipher (inverse $ toC $ prim256 p) s256
+                      [ benchmarkCipher (toH $ prim128 p) s128
+                      , benchmarkCipher (toC $ prim128 p) s128
+                      , benchmarkCipher (toH $ prim192 p) s192
+                      , benchmarkCipher (toC $ prim192 p) s192
+                      , benchmarkCipher (toH $ prim256 p) s256
+                      , benchmarkCipher (toC $ prim256 p) s256
+                      , benchmarkCipher (inverse $ toH $ prim128 p) s128
+                      , benchmarkCipher (inverse $ toC $ prim128 p) s128
+                      , benchmarkCipher (inverse $ toH $ prim192 p) s192
+                      , benchmarkCipher (inverse $ toC $ prim192 p) s192
+                      , benchmarkCipher (inverse $ toH $ prim256 p) s256
+                      , benchmarkCipher (inverse $ toC $ prim256 p) s256
                       ]
   where
+    benchmarkCipher g tk = benchmarker g tk (nBlocks g)
     first (a,_,_) = a
     toH :: AES mode k -> HAESGadget mode k EncryptMode
     toH _ = undefined

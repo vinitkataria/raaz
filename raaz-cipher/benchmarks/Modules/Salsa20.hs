@@ -30,20 +30,21 @@ testKey256 =  (fromByteString  $ pack [1..32], fromByteString $ pack [33..48])
 benchmarksTiny = take 2 <$> benchmarks
 
 benchmarks = sequence
-             [ benchmarker s20_128  testKey128 (nBlocks s20_128)
-             , benchmarker cs20_128 testKey128 (nBlocks cs20_128)
-             , benchmarker s12_128  testKey128 (nBlocks s12_128)
-             , benchmarker cs12_128 testKey128 (nBlocks cs12_128)
-             , benchmarker s8_128  testKey128 (nBlocks s8_128)
-             , benchmarker cs8_128 testKey128 (nBlocks cs8_128)
-             , benchmarker s20_256  testKey256 (nBlocks s20_256)
-             , benchmarker cs20_256 testKey256 (nBlocks cs20_256)
-             , benchmarker s12_256  testKey256 (nBlocks s12_256)
-             , benchmarker cs12_256 testKey256 (nBlocks cs12_256)
-             , benchmarker s8_256  testKey256 (nBlocks s8_256)
-             , benchmarker cs8_256 testKey256 (nBlocks cs8_256)
+             [ benchmarkCipher s20_128  testKey128
+             , benchmarkCipher cs20_128 testKey128
+             , benchmarkCipher s12_128  testKey128
+             , benchmarkCipher cs12_128 testKey128
+             , benchmarkCipher s8_128  testKey128
+             , benchmarkCipher cs8_128 testKey128
+             , benchmarkCipher s20_256  testKey256
+             , benchmarkCipher cs20_256 testKey256
+             , benchmarkCipher s12_256  testKey256
+             , benchmarkCipher cs12_256 testKey256
+             , benchmarkCipher s8_256  testKey256
+             , benchmarkCipher cs8_256 testKey256
              ]
   where
+    benchmarkCipher g tk = benchmarker g tk (nBlocks g)
     s20_128 :: HSalsa20Gadget R20 KEY128
     s20_128 = undefined
     s20_256 :: HSalsa20Gadget R20 KEY256
