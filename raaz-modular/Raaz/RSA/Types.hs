@@ -17,6 +17,7 @@ module Raaz.RSA.Types
        , OAEP(..)
 #endif
        , RSASignGadget(..)
+       , RSAVerifyGadget(..)
        ) where
 
 import Control.Applicative
