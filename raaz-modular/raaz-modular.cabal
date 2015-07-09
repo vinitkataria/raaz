@@ -19,11 +19,16 @@ source-repository head
 
 library
   exposed-modules: Raaz.Number
+                 , Raaz.RSA.Exception
                  , Raaz.Public
+                 , Raaz.RSA.Signature
                  , Raaz.Number.Internals
                  , Raaz.DH
                  , Raaz.KeyExchange
-  other-modules: Raaz.DH.Types
+  other-modules: Raaz.RSA.Types
+               , Raaz.RSA.Signature.Instances
+               , Raaz.RSA.Signature.Primitives
+               , Raaz.DH.Types
                , Raaz.DH.Exchange
                , Raaz.Number.Util
                , Raaz.Number.Modular

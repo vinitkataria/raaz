@@ -11,6 +11,7 @@ verification.
 {-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE CPP                        #-}
+{-# LANGUAGE UndecidableInstances       #-}
 {-# OPTIONS_GHC -fno-warn-orphans       #-}
 module Raaz.RSA.Signature.Instances () where
 
@@ -43,55 +44,59 @@ instance Hash h => SafePrimitive (RSA k h PKCS SignMode)
 
 instance ( Hash h
          , Storable k
-         ,
          ) => CryptoPrimitive (RSA k h PKCS SignMode) where
-  type Recommended (RSA k h PKCS SignMode) = RSAGadget k (Recommended h) PKCS SignMode
-  type Reference (RSA k h PKCS SignMode) = RSAGadget k (Reference h) PKCS SignMode
+  type Recommended (RSA k h PKCS SignMode) = RSASignGadget k (Recommended h) PKCS SignMode
+  type Reference (RSA k h PKCS SignMode) = RSASignGadget k (Reference h) PKCS SignMode
 
 
 -- | Memory used in RSA Signing gadget
-newtype RSASignMem k h m = RSASignMem (MemoryCell (PrivateKey k), m)
+-- newtype RSASignMem k h m = RSASignMem (MemoryCell (PrivateKey k), m)
 
-deriving instance (Storable k, Memory m) => Memory (RSASignMem k h m)
+instance (Gadget g, Storable k, Hash (PrimitiveOf g)) => Memory (RSASignGadget k g n m) where
+
+  memoryAlloc = RSASignGadget <$> memoryAlloc <*> memoryAlloc
+  underlyingPtr (RSASignGadget kcell _) = underlyingPtr kcell
 
 instance ( Storable k
-         , InitializableMemory m
-         , Hash h
-         , IV m ~ Key h
-         ) => InitializableMemory (RSASignMem k h m) where
-  type IV (RSASignMem k h m) = PrivateKey k
+         , Gadget g
+         , Hash (PrimitiveOf g)
+         , IV g ~ Key (PrimitiveOf g)
+         ) => InitializableMemory (RSASignGadget k g n m) where
+  type IV (RSASignGadget k g n m) = PrivateKey k
 
-  initializeMemory rmem@(RSASignMem (kcell, hmem)) k = do
+  initializeMemory rmem@(RSASignGadget kcell g) k = do
     cellPoke kcell k
-    initializeMemory hmem (defaultKey (rHash rmem))
+    initializeMemory g (defaultKey $ primitiveOf (rHash rmem))
       where
-        rHash :: RSASignMem k h m -> h
+        rHash :: RSASignGadget k g n m -> g
         rHash _ = undefined
 
 
 -- | Return the signature as a Word. This is where the actual signing
 -- is done of the calculated hash.
-instance ( FinalizableMemory m
-         , FV m ~ Key h
-         , Hash h
+instance ( Gadget g
+         , FinalizableMemory g
+         , FV g ~ Key (PrimitiveOf g)
+         , Hash (PrimitiveOf g)
          , Storable k
          , Modular k
-         , DEREncoding h
+         , DEREncoding (PrimitiveOf g)
          , Eq k
          , Ord k
          , Num k
-         ) => FinalizableMemory (RSASignMem k h m) where
-  type FV (RSASignMem k h m) = RSA k h PKCS SignMode
+         , IV g ~ Key (PrimitiveOf g)
+         ) => FinalizableMemory (RSASignGadget k g n m) where
+  type FV (RSASignGadget k g n m) = RSA k (PrimitiveOf g) PKCS SignMode
 
-  finalizeMemory m@(RSASignMem (kcell, hmem)) = do
+  finalizeMemory m@(RSASignGadget kcell g) = do
     k <- finalizeMemory kcell
-    hcxt <- getDigest (getH m) <$> finalizeMemory hmem
+    hcxt <- getDigest (getH m) <$> finalizeMemory g
     return $ RSA $ rsaPKCSSign hcxt k
     where
-      getDigest :: h -> Key h -> h
+      getDigest :: g -> Key (PrimitiveOf g) -> (PrimitiveOf g)
       getDigest _ = hashDigest
-      getH :: RSASignMem k h m -> h
-      getH = undefined
+      getH :: RSASignGadget k g n m -> g
+      getH _ = undefined
 
 
 -- | Padding for signature primitive is same as that of the underlying
@@ -111,133 +116,126 @@ instance ( Gadget g
          , Hash (PrimitiveOf g)
          , PaddableGadget g
          , Storable k
-         ) => Gadget (RSAGadget k g PKCS SignMode) where
+         ) => Gadget (RSASignGadget k g PKCS SignMode) where
 
-  type PrimitiveOf (RSAGadget k g PKCS SignMode) = RSA k (PrimitiveOf g) PKCS SignMode
+  type PrimitiveOf (RSASignGadget k g PKCS SignMode) = RSA k (PrimitiveOf g) PKCS SignMode
 
-  -- type MemoryOf (RSAGadget k g PKCS SignMode)    = RSASignMem k (PrimitiveOf g) (MemoryOf g)
-
-  -- newGadgetWithMemory (RSASignMem (ck, gmem))    = RSAGadget ck <$> newGadgetWithMemory gmem
-
-  -- getMemory (RSAGadget ck g)                     = RSASignMem (ck, getMemory g)
-
-  apply (RSAGadget _ g) blks                     = apply g blks'
+  apply (RSASignGadget _ g) blks                     = apply g blks'
     where blks'                                  = toEnum $ fromEnum blks
-
 
 -- | PaddableGadget instance which is same as the underlying hashing
 -- gadget.
 instance ( Hash (PrimitiveOf g)
          , PaddableGadget g
          , Storable k
-         ) => PaddableGadget (RSAGadget k g PKCS SignMode) where
-  unsafeApplyLast (RSAGadget _ g) blks = unsafeApplyLast g blks'
+         ) => PaddableGadget (RSASignGadget k g PKCS SignMode) where
+  unsafeApplyLast (RSASignGadget _ g) blks = unsafeApplyLast g blks'
     where blks' = toEnum $ fromEnum blks
 
 
---------------------------------- PKCS Verify ----------------------------------
+-- --------------------------------- PKCS Verify ----------------------------------
 
--- | Primitive instance for Signature verification primitive.
-instance Hash h => Primitive (RSA k h PKCS VerifyMode) where
+-- -- | Primitive instance for Signature verification primitive.
+-- instance Hash h => Primitive (RSA k h PKCS VerifyMode) where
 
-  blockSize _ = blockSize (undefined :: h)
+--   blockSize _ = blockSize (undefined :: h)
 
-  type Key (RSA k h PKCS VerifyMode) = (PublicKey k, RSA k h PKCS SignMode)
+--   type Key (RSA k h PKCS VerifyMode) = (PublicKey k, RSA k h PKCS SignMode)
 
--- | Signature verification is a safe primitive if the underlying hash is safe.
-instance Hash h => SafePrimitive (RSA k h PKCS VerifyMode)
-
-
-instance ( Hash h
-         , Storable k
-         ) => CryptoPrimitive (RSA k h PKCS VerifyMode) where
-  type Recommended (RSA k h PKCS VerifyMode) = RSAGadget k (Recommended h) PKCS VerifyMode
-  type Reference (RSA k h PKCS VerifyMode) = RSAGadget k (Reference h) PKCS VerifyMode
+-- -- | Signature verification is a safe primitive if the underlying hash is safe.
+-- instance Hash h => SafePrimitive (RSA k h PKCS VerifyMode)
 
 
--- | Memory used in RSA Verification gadget
-newtype RSAVerifyMem k h m = RSAVerifyMem (MemoryCell (PublicKey k), MemoryCell k, m)
+-- instance ( Hash h
+--          , Storable k
+--          ) => CryptoPrimitive (RSA k h PKCS VerifyMode) where
+--   type Recommended (RSA k h PKCS VerifyMode) = RSAGadget k (Recommended h) PKCS VerifyMode
+--   type Reference (RSA k h PKCS VerifyMode) = RSAGadget k (Reference h) PKCS VerifyMode
 
-deriving instance (Storable k, Memory m) => Memory (RSAVerifyMem k h m)
 
-instance ( Storable k
-         , InitializableMemory m
-         , Hash h
-         , IV m ~ Key h
-         ) => InitializableMemory (RSAVerifyMem k h m) where
-  type IV (RSAVerifyMem k h m) = (PublicKey k, RSA k h PKCS SignMode)
+-- -- | Memory used in RSA Verification gadget
+-- newtype RSAVerifyMem k h m = RSAVerifyMem (MemoryCell (PublicKey k), MemoryCell k, m)
 
-  initializeMemory rmem@(RSAVerifyMem (kcell, sigcell, hmem)) (k, RSA sig) = do
-    cellPoke kcell k
-    cellPoke sigcell sig
-    initializeMemory hmem (defaultKey (rHash rmem))
-      where
-        rHash :: RSAVerifyMem k h m -> h
-        rHash _ = undefined
+-- deriving instance (Storable k, Memory m) => Memory (RSAVerifyMem k h m)
 
--- | Verify the signature and return `True` if success otherwise
--- `False`. This is where the actual signature verification is done of
--- the calculated hash.
-instance ( FinalizableMemory m
-         , FV m ~ Key h
-         , Hash h
-         , Storable k
-         , Modular k
-         , DEREncoding h
-         , Eq k
-         , Ord k
-         , Num k
-         ) => FinalizableMemory (RSAVerifyMem k h m) where
-  type FV (RSAVerifyMem k h m) = Bool
+-- instance ( Storable k
+--          , InitializableMemory m
+--          , Hash h
+--          , IV m ~ Key h
+--          ) => InitializableMemory (RSAVerifyMem k h m) where
+--   type IV (RSAVerifyMem k h m) = (PublicKey k, RSA k h PKCS SignMode)
 
-  finalizeMemory m@(RSAVerifyMem (kcell, sigcell, hmem)) = do
-    k <- finalizeMemory kcell
-    sig <- finalizeMemory sigcell
-    hcxt <- getDigest (getH m) <$> finalizeMemory hmem
-    return $ rsaPKCSVerify hcxt k sig
-    where
-      getDigest :: h -> Key h -> h
-      getDigest _ = hashDigest
-      getH :: RSAVerifyMem k h m -> h
-      getH = undefined
+--   initializeMemory rmem@(RSAVerifyMem (kcell, sigcell, hmem)) (k, RSA sig) = do
+--     cellPoke kcell k
+--     cellPoke sigcell sig
+--     initializeMemory hmem (defaultKey (rHash rmem))
+--       where
+--         rHash :: RSAVerifyMem k h m -> h
+--         rHash _ = undefined
 
-instance Hash h => HasPadding (RSA k h PKCS VerifyMode) where
-  padLength _  = padLength (undefined :: h)
+-- -- | Verify the signature and return `True` if success otherwise
+-- -- `False`. This is where the actual signature verification is done of
+-- -- the calculated hash.
+-- instance ( FinalizableMemory m
+--          , FV m ~ Key h
+--          , Hash h
+--          , Storable k
+--          , Modular k
+--          , DEREncoding h
+--          , Eq k
+--          , Ord k
+--          , Num k
+--          ) => FinalizableMemory (RSAVerifyMem k h m) where
+--   type FV (RSAVerifyMem k h m) = Bool
 
-  padding _ = padding (undefined :: h)
+--   finalizeMemory m@(RSAVerifyMem (kcell, sigcell, hmem)) = do
+--     k <- finalizeMemory kcell
+--     sig <- finalizeMemory sigcell
+--     hcxt <- getDigest (getH m) <$> finalizeMemory hmem
+--     return $ rsaPKCSVerify hcxt k sig
+--     where
+--       getDigest :: h -> Key h -> h
+--       getDigest _ = hashDigest
+--       getH :: RSAVerifyMem k h m -> h
+--       getH = undefined
 
-  unsafePad _ = unsafePad (undefined :: h)
+-- instance Hash h => HasPadding (RSA k h PKCS VerifyMode) where
+--   padLength _  = padLength (undefined :: h)
 
-  maxAdditionalBlocks _ = toEnum . fromEnum
-                       $ maxAdditionalBlocks (undefined :: h)
+--   padding _ = padding (undefined :: h)
 
--- | Padding for verification primitive is same as that of the
--- underlying hash.
-instance ( Gadget g
-         , Hash (PrimitiveOf g)
-         , PaddableGadget g
-         , Storable k
-         ) => Gadget (RSAGadget k g PKCS VerifyMode) where
+--   unsafePad _ = unsafePad (undefined :: h)
 
-  type PrimitiveOf (RSAGadget k g PKCS VerifyMode)     = RSA k (PrimitiveOf g) PKCS VerifyMode
+--   maxAdditionalBlocks _ = toEnum . fromEnum
+--                        $ maxAdditionalBlocks (undefined :: h)
 
-  -- type MemoryOf (RSAGadget k g PKCS VerifyMode)        = RSAVerifyMem k (PrimitiveOf g) (MemoryOf g)
+-- -- | Padding for verification primitive is same as that of the
+-- -- underlying hash.
+-- instance ( Gadget g
+--          , Hash (PrimitiveOf g)
+--          , PaddableGadget g
+--          , Storable k
+--          ) => Gadget (RSAGadget k g PKCS VerifyMode) where
 
-  -- newGadgetWithMemory (RSAVerifyMem (cpk, csig, gmem)) = RSAGadget (cpk,csig) <$> newGadgetWithMemory gmem
+--   type PrimitiveOf (RSAGadget k g PKCS VerifyMode)     = RSA k (PrimitiveOf g) PKCS VerifyMode
 
-  -- getMemory (RSAGadget (ck,csig) g)                    = RSAVerifyMem (ck, csig, getMemory g)
+--   -- type MemoryOf (RSAGadget k g PKCS VerifyMode)        = RSAVerifyMem k (PrimitiveOf g) (MemoryOf g)
 
-  apply (RSAGadget _ g) blks                           = apply g blks'
-    where blks'                                        = toEnum $ fromEnum blks
+--   -- newGadgetWithMemory (RSAVerifyMem (cpk, csig, gmem)) = RSAGadget (cpk,csig) <$> newGadgetWithMemory gmem
 
--- | PaddableGadget gadget instance which is same as the underlying
--- hashing gadget.
-instance ( Hash (PrimitiveOf g)
-         , PaddableGadget g
-         , Storable k
-         ) => PaddableGadget (RSAGadget k g PKCS VerifyMode) where
-  unsafeApplyLast (RSAGadget _ g) blks = unsafeApplyLast g blks'
-    where blks' = toEnum $ fromEnum blks
+--   -- getMemory (RSAGadget (ck,csig) g)                    = RSAVerifyMem (ck, csig, getMemory g)
+
+--   apply (RSAGadget _ g) blks                           = apply g blks'
+--     where blks'                                        = toEnum $ fromEnum blks
+
+-- -- | PaddableGadget gadget instance which is same as the underlying
+-- -- hashing gadget.
+-- instance ( Hash (PrimitiveOf g)
+--          , PaddableGadget g
+--          , Storable k
+--          ) => PaddableGadget (RSAGadget k g PKCS VerifyMode) where
+--   unsafeApplyLast (RSAGadget _ g) blks = unsafeApplyLast g blks'
+--     where blks' = toEnum $ fromEnum blks
 
 ------------------------------------- PKCS Auth instance ------------------------
 

@@ -16,7 +16,7 @@ module Raaz.RSA.Types
        , PSS(..)
        , OAEP(..)
 #endif
-       , RSAGadget(..)
+       , RSASignGadget(..)
        ) where
 
 import Control.Applicative
@@ -153,28 +153,43 @@ data PSS = PSS deriving (Show, Eq)
 #endif
 
 -- | RSA Gadget
-#if UseKinds
-data RSAGadget k g (n :: RSAMode) (m :: Mode) =
-#else
-data RSAGadget k g n m =
-#endif
-     RSAGadget (RSAMem k m) g
+-- #if UseKinds
+-- data RSAGadget k g (n :: RSAMode) (m :: Mode) =
+-- #else
+-- data RSAGadget k g n m =
+-- #endif
+--      RSAGadget (RSAMem k m) g
 
+-- | RSA Sign Gadget
+#if UseKinds
+data RSASignGadget k g (n :: RSAMode) (m :: Mode) =
+#else
+data RSASignGadget k g n m =
+#endif
+     RSASignGadget (MemoryCell (PrivateKey k)) g
+
+-- | RSA Verify Gadget
+#if UseKinds
+data RSAVerifyGadget k g (n :: RSAMode) (m :: Mode) =
+#else
+data RSAVerifyGadget k g n m =
+#endif
+     RSAVerifyGadget (MemoryCell (PublicKey k), MemoryCell k) g
 
 -- | This is a helper type family to unify Auth, Verify, Encrypt and
 -- Decrypt Gadgets in the same RSAGadget. It changes the type of
 -- Gadget's memory depending on Mode.
-#if UseKinds
-type family RSAMem k (m :: Mode) :: *
-#else
-type family RSAMem k m :: *
-#endif
+-- #if UseKinds
+-- type family RSAMem k (m :: Mode) :: *
+-- #else
+-- type family RSAMem k m :: *
+-- #endif
 
-type instance RSAMem k SignMode = MemoryCell (PrivateKey k)
-type instance RSAMem k VerifyMode = (MemoryCell (PublicKey k), MemoryCell k)
+-- type instance RSAMem k SignMode = MemoryCell (PrivateKey k)
+-- type instance RSAMem k VerifyMode = (MemoryCell (PublicKey k), MemoryCell k)
 
-type instance RSAMem k EncryptMode = MemoryCell (PublicKey k)
-type instance RSAMem k DecryptMode = MemoryCell (PrivateKey k)
+-- type instance RSAMem k EncryptMode = MemoryCell (PublicKey k)
+-- type instance RSAMem k DecryptMode = MemoryCell (PrivateKey k)
 
 keySize :: Storable w => k w -> BYTES Int
 keySize = BYTES . sizeOf . getW
