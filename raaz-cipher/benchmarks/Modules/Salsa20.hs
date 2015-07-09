@@ -29,57 +29,42 @@ testKey256 =  (fromByteString  $ pack [1..32], fromByteString $ pack [33..48])
 
 benchmarksTiny = take 2 <$> benchmarks
 
--- benchCipher g iv = do
---   g' <- createGadget g
---   return $ benchGadgetWith g' iv (nBlocks g')
-
-action_s20_128 :: (KEY128, Nonce) -> HSalsa20Gadget R20 KEY128 -> IO Benchmark
-action_s20_128 tk g = benchGadgetWith g tk (nBlocks g)
-
-benchmarker
 benchmarks = sequence
-            [ benchmarker s20_128 testKey128 (nBlocks s20_128) ]
+             [ benchmarker s20_128  testKey128 (nBlocks s20_128)
+             , benchmarker cs20_128 testKey128 (nBlocks cs20_128)
+             , benchmarker s12_128  testKey128 (nBlocks s12_128)
+             , benchmarker cs12_128 testKey128 (nBlocks cs12_128)
+             , benchmarker s8_128  testKey128 (nBlocks s8_128)
+             , benchmarker cs8_128 testKey128 (nBlocks cs8_128)
+             , benchmarker s20_256  testKey256 (nBlocks s20_256)
+             , benchmarker cs20_256 testKey256 (nBlocks cs20_256)
+             , benchmarker s12_256  testKey256 (nBlocks s12_256)
+             , benchmarker cs12_256 testKey256 (nBlocks cs12_256)
+             , benchmarker s8_256  testKey256 (nBlocks s8_256)
+             , benchmarker cs8_256 testKey256 (nBlocks cs8_256)
+             ]
   where
     s20_128 :: HSalsa20Gadget R20 KEY128
     s20_128 = undefined
-
-
--- benchmarks = sequence
---              [ benchCipher s20_128  testKey128
---              , benchCipher cs20_128 testKey128
---              , benchCipher s12_128  testKey128
---              , benchCipher cs12_128 testKey128
---              , benchCipher s8_128  testKey128
---              , benchCipher cs8_128 testKey128
---              , benchCipher s20_256  testKey256
---              , benchCipher cs20_256 testKey256
---              , benchCipher s12_256  testKey256
---              , benchCipher cs12_256 testKey256
---              , benchCipher s8_256  testKey256
---              , benchCipher cs8_256 testKey256
---              ]
---   where
---     s20_128 :: HSalsa20Gadget R20 KEY128
---     s20_128 = undefined
---     s20_256 :: HSalsa20Gadget R20 KEY256
---     s20_256 = undefined
---     s12_128 :: HSalsa20Gadget R12 KEY128
---     s12_128 = undefined
---     s12_256 :: HSalsa20Gadget R12 KEY256
---     s12_256 = undefined
---     s8_128 :: HSalsa20Gadget R8 KEY128
---     s8_128 = undefined
---     s8_256 :: HSalsa20Gadget R8 KEY256
---     s8_256 = undefined
---     cs20_128 :: CSalsa20Gadget R20 KEY128
---     cs20_128 = undefined
---     cs20_256 :: CSalsa20Gadget R20 KEY256
---     cs20_256 = undefined
---     cs12_128 :: CSalsa20Gadget R12 KEY128
---     cs12_128 = undefined
---     cs12_256 :: CSalsa20Gadget R12 KEY256
---     cs12_256 = undefined
---     cs8_128 :: CSalsa20Gadget R8 KEY128
---     cs8_128 = undefined
---     cs8_256 :: CSalsa20Gadget R8 KEY256
---     cs8_256 = undefined
+    s20_256 :: HSalsa20Gadget R20 KEY256
+    s20_256 = undefined
+    s12_128 :: HSalsa20Gadget R12 KEY128
+    s12_128 = undefined
+    s12_256 :: HSalsa20Gadget R12 KEY256
+    s12_256 = undefined
+    s8_128 :: HSalsa20Gadget R8 KEY128
+    s8_128 = undefined
+    s8_256 :: HSalsa20Gadget R8 KEY256
+    s8_256 = undefined
+    cs20_128 :: CSalsa20Gadget R20 KEY128
+    cs20_128 = undefined
+    cs20_256 :: CSalsa20Gadget R20 KEY256
+    cs20_256 = undefined
+    cs12_128 :: CSalsa20Gadget R12 KEY128
+    cs12_128 = undefined
+    cs12_256 :: CSalsa20Gadget R12 KEY256
+    cs12_256 = undefined
+    cs8_128 :: CSalsa20Gadget R8 KEY128
+    cs8_128 = undefined
+    cs8_256 :: CSalsa20Gadget R8 KEY256
+    cs8_256 = undefined
