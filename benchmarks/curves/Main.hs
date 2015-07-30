@@ -1,8 +1,8 @@
 import           Data.Version
-import           Criterion.Main    (defaultMainWith)
-import           Criterion         (bgroup)
-import           Criterion.Config  (Config(..), ljust, defaultConfig)
-import           Paths_src         (version)
+import           Criterion.Main          (defaultMainWith)
+import           Criterion               (bgroup)
+import           Criterion.Main.Options
+import           Paths_src               (version)
 import           System.Random
 
 import           Raaz.Curves.EC25519
@@ -18,7 +18,7 @@ main = do
   let (r1,gen1) = randomR (1, curve25519P - 1) gen
       (r2,gen2) = randomR (1, curve25519P - 1) gen1
   putStrLn $ "Running benchmarks for " ++ pkgName
-  defaultMainWith defaultConfig (return ()) $ benchmarks (integerToP25519 r1, integerToP25519 r2)
+  defaultMainWith defaultConfig $ benchmarks (integerToP25519 r1, integerToP25519 r2)
 
 benchmarks (r1,r2) = [ bgroup "Secret & PublicToken Generation" $ EC.benchSecretPublic
                      , bgroup "Secret & PublicToken Generation with random provided" $ EC.benchParamsGivenRandom r1

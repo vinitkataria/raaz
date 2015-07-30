@@ -1,8 +1,8 @@
 import           Data.Version
-import           Criterion.Main    (defaultMainWith)
-import           Criterion         (bgroup)
-import           Criterion.Config  (Config(..), ljust, defaultConfig)
-import           Paths_src         (version)
+import           Criterion.Main          (defaultMainWith)
+import           Criterion               (bgroup)
+import           Criterion.Main.Options
+import           Paths_src               (version)
 
 import qualified Modules.AES       as AES
 import qualified Modules.Salsa20   as S20
@@ -11,16 +11,11 @@ import           Modules.Defaults
 
 pkgName = "raaz-cipher-" ++ showVersion version
 
-myConfig :: Config
-myConfig = defaultConfig {
-  cfgSamples = ljust 10
-  }
-
 main :: IO ()
 main = do putStrLn $ "Running benchmarks for " ++ pkgName
           putStrLn $ "Data Size : " ++ show nSize
           b <- benchmarks
-          defaultMainWith myConfig (return ()) b
+          defaultMainWith defaultConfig b
 
 benchmarksTiny = do
   aes <- AES.benchmarksTiny

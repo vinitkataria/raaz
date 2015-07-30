@@ -22,7 +22,7 @@ benchGadget  :: (Gadget g, HasName g)
              -> CryptoPtr              -- ^ Buffer on which to benchmark
              -> BLOCKS (PrimitiveOf g) -- ^ Size of Buffer
              -> Benchmark
-benchGadget g iv cptr nblks = bench (getName g) process
+benchGadget g iv cptr nblks = bench (getName g) $ nfIO process
   where process = initializeMemory g iv >> apply g nblks cptr
 
 -- | Allocates the buffer and performs the benchmark
@@ -31,7 +31,7 @@ benchGadgetWith :: (Gadget g, HasName g)
                 -> Key (PrimitiveOf g)    -- ^ Gadget Key
                 -> BLOCKS (PrimitiveOf g) -- ^ Size of random buffer which will be allocated
                 -> Benchmark
-benchGadgetWith g iv nblks = bench (getName g) process
+benchGadgetWith g iv nblks = bench (getName g) $ nfIO process
   where
     process = do
       initializeMemory g iv
@@ -51,7 +51,7 @@ benchmarker :: ( Gadget g
                  -> Key (PrimitiveOf g)    -- ^ Gadget Key
                  -> BLOCKS (PrimitiveOf g) -- ^ Size of random buffer which will be allocated
                  -> IO Benchmark
-benchmarker g iv nblks = return $ bench (getName g) benchAction
+benchmarker g iv nblks = return $ bench (getName g) (nfIO benchAction)
   where process :: ( g1 ~ g
                    , Gadget g1
                    , Key (PrimitiveOf g) ~ Key (PrimitiveOf g1)
