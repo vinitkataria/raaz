@@ -85,7 +85,7 @@ before_install:
   # - ghc -o travis scripts/travis-build.hs
 
 install:
- - cabal install -j --only-dependencies --enable-tests --enable-benchmarks
+ - cabal install --only-dependencies --enable-tests --enable-benchmarks
 
 before_script:
   - cabal configure --enable-tests --enable-benchmarks -v2
