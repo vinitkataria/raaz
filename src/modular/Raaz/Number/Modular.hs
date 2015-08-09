@@ -46,12 +46,12 @@ instance Modular Integer where
   powModulo = powModuloSlow
 #endif
 
-#if MIN_VERSION_integer_gmp(0,5,1)
-  powModuloSafe b e m | odd m      = powModSecInteger b e m
-                      | otherwise  = powModInteger b e m
+#if MIN_VERSION_integer_gmp(1,0,0)
+  powModuloSafe b e m | odd m      = powModuloSlowSafe b e m
 #else
-  powModuloSafe = powModuloSlowSafe
+  powModuloSafe b e m | odd m      = powModSecInteger b e m
 #endif
+                      | otherwise  = powModInteger b e m
 
 -- | Modular exponentiation @x^n mod m@ using binary exponentiation.
 powModuloSlow :: Integer -> Integer -> Integer -> Integer
