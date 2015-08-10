@@ -117,6 +117,9 @@ library
                , integer-gmp
                , template-haskell               >= 2.7
 
+  if impl(ghc <= 7.6)
+    build-depends: unix                           == 2.6.0.1
+
   ghc-options: -Wall
 
   if impl(ghc >= 7.6)
