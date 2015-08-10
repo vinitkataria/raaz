@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeFamilies #-}
 module Modules.AES.Defaults ( benchmarksDefault
                             , benchmarksTinyDefault
                             , testKey128, testKey192, testKey256
