@@ -116,6 +116,7 @@ library
                , data-default                   >= 0.4 && < 0.6
                , integer-gmp                    >= 0.5
                , template-haskell               >= 2.8
+               , unix                           >= 2.7 && < 2.8
 
   ghc-options: -Wall
 
@@ -365,6 +366,7 @@ test-Suite tests
                , test-framework-hunit           >= 0.2 && < 0.4
                , test-framework-quickcheck2     >= 0.2 && < 0.4
                , vector                         >= 0.10
+               , unix                           >= 2.7 && < 2.8
                , src
 
   if impl(ghc >= 7.6)
@@ -388,6 +390,7 @@ benchmark bench-hash
                , bytestring                     >= 0.10
                , criterion                      >= 1.0 && < 1.2
                , vector                         >= 0.10
+               , unix                           >= 2.7 && < 2.8
                --
                -- Raaz dependencies
                --
@@ -416,6 +419,7 @@ benchmark bench-cipher
                , bytestring                     >= 0.10
                , data-default                   >= 0.4     && < 0.6
                , criterion                      >= 1.0     && < 1.2
+               , unix                           >= 2.7     && < 2.8
                --
                -- Raaz dependencies
                --
@@ -437,6 +441,7 @@ benchmark bench-modular
                , criterion                      >= 1.0 && < 1.2
                , deepseq                        >= 1.3.0.1
                , random                         >= 1.0 && < 2.0
+               , unix                           >= 2.7 && < 2.8
                --
                -- Raaz dependencies
                --
@@ -459,6 +464,7 @@ benchmark bench-curves
                , criterion                      >= 1.0     && < 1.2
                , deepseq                        >= 1.3.0.1
                , random                         >= 1.0     && < 2.0
+               , unix                           >= 2.7     && < 2.8
                --
                -- Raaz dependencies
                --
