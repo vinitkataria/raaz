@@ -77,8 +77,6 @@ before_install:
   - cabal --version
   # Output all the registered packages.
   - ghc-pkg list
-  - ghc-pkg unregister unix-2.6.0.1
-  - ghc-pkg unregister Cabal-1.22.2.0
   # Output other variables.
   - echo HASKELL_PLATFORM=${HASKELL_PLATFORM}
   - echo PARALLEL_BUILDS=${PARALLEL_BUILDS}
@@ -87,6 +85,7 @@ before_install:
   # - ghc -o travis scripts/travis-build.hs
 
 install:
+ - cabal sandbox init
  - cabal install -j --only-dependencies --enable-tests --enable-benchmarks
 
 before_script:
